@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DAG AVIATOR REALISTIC</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; color: white; touch-action: none; }
+        canvas { display: block; filter: contrast(1.1) brightness(1.1); }
+        
+        #ui { position: absolute; top: 8%; left: 0; width: 100%; pointer-events: none; text-align: center; z-index: 10; }
+        #multiplier { font-size: 85px; font-weight: 900; color: #00f2ff; text-shadow: 0 0 20px #00f2ff, 0 0 40px #0066ff; font-family: monospace; }
+        #status { font-size: 18px; color: #aaa; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 10px; }
+
+        #controls { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, #0a0c10, #151921); padding: 30px 20px; border-top: 2px solid #2a2f3a; z-index: 20; box-shadow: 0 -10px 30px rgba(0,0,0,0.8); }
+        .bet-box { max-width: 450px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
+        
+        input { background: #000; border: 1px solid #3a4150; color: #fff; padding: 18px; border-radius: 12px; font-size: 22px; text-align: center; outline: none; box-shadow: inset 0 0 10px rgba(0,242,255,0.1); }
+        
+        button { padding: 22px; border-radius: 12px; font-size: 20px; font-weight: 900; border: none; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        #btn-bet { background: linear-gradient(180deg, #00ff88, #00a859); color: #002b17; box-shadow: 0 0 20px rgba(0,255,136,0.4); }
+        #btn-cash { background: linear-gradient(180deg, #ffcc00, #d4ac00); color: #2b2100; display: none; box-shadow: 0 0 20px rgba(255,204,0,0.4); }
+        button:active { transform: scale(0.96); box-shadow: none; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div id="status">Waiting for bet</div>
+        <div id="multiplier">1.00x</div>
+    </div>
+
+    <div id="controls">
+        <div class="bet-box">
+            <input type="number" id="bet-input" value="10" min="1">
+            <button id="btn-bet" onclick="startRound()">Place Bet</button>
+            <button id="btn-cash" onclick="cashOut()">Cashout</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const multDisplay = document.getElementById('multiplier');
+        const statusDisplay = document.getElementById('status');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let isFlying = false, multiplier = 1.0, bet = 0, crashPoint = 0, startTime = 0;
+        let points = [], stars = [], particles = [];
+
+        // Инициализация космоса
+        for(let i=0; i<150; i++) stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, z: Math.random()*2, o: Math.random()});
+
+        function drawRocket(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            // 1. Реалистичное пламя (многослойное)
+            const time = Date.now() * 0.01;
+            for(let i=0; i<3; i++) {
+                const size = 20 + Math.sin(time + i) * 10;
+                const grad = ctx.createRadialGradient(-20, 0, 0, -30, 0, size * 2);
+                grad.addColorStop(0, '#fff');
+                grad.addColorStop(0.3, '#ffcc00');
+                grad.addColorStop(0.6, '#ff4400');
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.ellipse(-25, 0, size * 2.5, size / 1.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 2. Корпус (Металлический градиент)
+            const bodyGrad = ctx.createLinearGradient(0, -15, 0, 15);
+            bodyGrad.addColorStop(0, '#7f8c8d');
+            bodyGrad.addColorStop(0.5, '#bdc3c7');
+            bodyGrad.addColorStop(1, '#2c3e50');
+            
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.moveTo(35, 0);
+            ctx.bezierCurveTo(35, -18, -25, -18, -25, -12);
+            ctx.lineTo(-25, 12);
+            ctx.bezierCurveTo(-25, 18, 35, 18, 35, 0);
+            ctx.fill();
+
+            // 3. Иллюминатор с бликом
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath(); ctx.arc(8, 0, 7, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#00f2ff';
+            ctx.beginPath(); ctx.arc(8, 0, 5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(10, -2, 2, 0, Math.PI*2); ctx.fill();
+
+            ctx.restore();
+        }
+
+        function draw() {
+            // Фон: глубокий космос
+            const bgGrad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
+            bgGrad.addColorStop(0, '#0a121d');
+            bgGrad.addColorStop(1, '#000000');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Звезды
+            ctx.fillStyle = "white";
+            stars.forEach(s => {
+                ctx.globalAlpha = s.o;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.z, 0, Math.PI*2); ctx.fill();
+                if(isFlying) {
+                    s.x -= s.z * 5;
+                    if(s.x < 0) s.x = canvas.width;
+                }
+            });
+            ctx.globalAlpha = 1.0;
+
+            if(isFlying) {
+                let elapsed = (Date.now() - startTime) / 1000;
+                multiplier = Math.pow(1.10, elapsed * 2);
+                
+                if(multiplier >= crashPoint) return gameOver();
+
+                multDisplay.innerText = multiplier.toFixed(2) + "x";
+
+                // Траектория (как на фото)
+                let plotX = 60 + (elapsed * 50);
+                let plotY = (canvas.height - 280) - (Math.pow(elapsed, 1.4) * 30);
+                let offsetX = plotX > canvas.width * 0.5 ? plotX - canvas.width * 0.5 : 0;
+                
+                points.push({x: plotX, y: plotY});
+
+                ctx.save();
+                ctx.translate(-offsetX, 0);
+                
+                // Свечение дуги
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#00f2ff';
+                ctx.strokeStyle = '#00f2ff';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                points.forEach(p => ctx.lineTo(p.x, p.y));
+                ctx.stroke();
+                ctx.restore();
+                ctx.shadowBlur = 0;
+
+                drawRocket(plotX - offsetX, plotY, -0.2);
+            }
+            requestAnimationFrame(draw);
+        }
+
+        function startRound() {
+            bet = parseInt(document.getElementById('bet-input').value);
+            if(isNaN(bet) || bet <= 0) return;
+            
+            crashPoint = (Math.random() < 0.08) ? 1.01 : (1 + Math.random() * 2 + Math.pow(Math.random(), 2) * 20).toFixed(2);
+            isFlying = true; multiplier = 1.0; startTime = Date.now();
+            points = [{x: 60, y: canvas.height - 280}];
+            
+            document.getElementById('btn-bet').style.display = 'none';
+            document.getElementById('btn-cash').style.display = 'block';
+            statusDisplay.innerText = "Rocket in flight";
+            multDisplay.style.color = "#00f2ff";
+        }
+
+        function cashOut() {
+            if(!isFlying) return;
+            isFlying = false;
+            let win = Math.floor(bet * multiplier);
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.sendData(JSON.stringify({action: "win", amount: win, bet: bet, game: "aviator"}));
+            statusDisplay.innerText = "Cashed out!";
+            setTimeout(() => location.reload(), 1500);
+        }
+
+        function gameOver() {
+            isFlying = false;
+            multDisplay.innerText = "CRASHED";
+            multDisplay.style.color = '#ff3e3e';
+            statusDisplay.innerText = "Rocket lost";
+            tg.HapticFeedback.notificationOccurred('error');
+            tg.sendData(JSON.stringify({action: "loss", bet: bet, game: "aviator"}));
+            setTimeout(() => location.reload(), 2500);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
