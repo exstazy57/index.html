@@ -3,46 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DAG Flappy Bird</title>
+    <title>DAG Bird Final</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #70c5ce; font-family: sans-serif; }
-        canvas { display: block; margin: 0 auto; background: #70c5ce; }
-        
-        /* Окно регистрации */
-        #reg-screen {
+        body { margin: 0; overflow: hidden; background: #70c5ce; font-family: sans-serif; touch-action: manipulation; }
+        canvas { display: block; }
+        #overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 10;
+            background: rgba(0,0,0,0.7); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 20; color: white;
         }
-        input { padding: 12px; border-radius: 8px; border: none; width: 200px; font-size: 16px; }
-        button { margin-top: 15px; padding: 10px 25px; background: #f7941d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        
-        /* Таблица лидеров */
-        #leaderboard {
-            position: fixed; bottom: -100%; left: 0; width: 100%; height: 50%;
-            background: white; border-radius: 20px 20px 0 0; transition: 0.5s; z-index: 5;
-            padding: 20px; box-sizing: border-box; box-shadow: 0 -5px 15px rgba(0,0,0,0.2);
-        }
-        #leaderboard.active { bottom: 0; }
-        .score-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        input { padding: 15px; border-radius: 10px; border: none; width: 220px; font-size: 18px; text-align: center; margin-bottom: 10px; }
+        button { padding: 15px 30px; background: #f7941d; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="reg-screen">
-    <h2 style="color: white;">Введите никнейм</h2>
-    <input type="text" id="nick-input" placeholder="Ваш ник...">
-    <button onclick="startGame()">Начать игру</button>
-</div>
-
-<div id="leaderboard">
-    <div style="display: flex; justify-content: space-between;">
-        <h3>🏆 Лидеры</h3>
-        <button onclick="closeLeaderboard()" style="background: #ccc; margin: 0;">Закрыть</button>
-    </div>
-    <div id="leader-list">
-        </div>
+<div id="overlay">
+    <h1 id="title">DAG BIRD</h1>
+    <input type="text" id="nick-input" placeholder="Ваш ник..." maxlength="12">
+    <button id="start-btn">ИГРАТЬ</button>
 </div>
 
 <canvas id="game"></canvas>
@@ -53,100 +33,156 @@
 
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const nickInput = document.getElementById('nick-input');
+    const startBtn = document.getElementById('start-btn');
+    const title = document.getElementById('title');
+
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    let bird = { x: 50, y: 150, w: 34, h: 24, gravity: 0.6, lift: -10, velocity: 0 };
-    let pipes = [];
-    let frame = 0;
-    let score = 0;
-    let gameRunning = false;
-
-    // Регистрация
-    function startGame() {
-        const nick = document.getElementById('nick-input').value;
-        if (nick.length < 2) return alert("Ник слишком короткий");
-        localStorage.setItem('dag_bird_name', nick);
-        document.getElementById('reg-screen').style.display = 'none';
-        gameRunning = true;
-        resetGame();
-        loop();
+    // --- ЗВУКИ ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSfx(f, type = 'sine') {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = type; o.frequency.value = f;
+        g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 0.1);
     }
 
-    // Логика игры (упрощенная)
-    function resetGame() {
-        bird.y = 150; bird.velocity = 0; pipes = []; score = 0; frame = 0;
+    // --- ПАРАМЕТРЫ ИГРЫ ---
+    let bird, pipes, score, frame, gameActive = false;
+    
+    // Проверка ника в памяти
+    if (localStorage.getItem('dag_nick')) {
+        nickInput.style.display = 'none';
+    }
+
+    function reset() {
+        bird = { x: 50, y: canvas.height/2, w: 40, h: 30, v: 0, g: 0.5, jump: -8, angle: 0 };
+        pipes = [];
+        score = 0;
+        frame = 0;
+    }
+
+    function start() {
+        if (nickInput.style.display !== 'none') {
+            const n = nickInput.value.trim();
+            if (n.length < 2) return alert("Ник слишком короткий!");
+            localStorage.setItem('dag_nick', n);
+        }
+        playSfx(500);
+        overlay.style.display = 'none';
+        reset();
+        gameActive = true;
+    }
+
+    startBtn.onclick = start;
+
+    function jump() {
+        if (gameActive) {
+            bird.v = bird.jump;
+            playSfx(400);
+        }
+    }
+
+    window.onkeydown = (e) => { if (e.code === 'Space') jump(); };
+    canvas.ontouchstart = (e) => { e.preventDefault(); jump(); };
+
+    function drawBird() {
+        ctx.save();
+        ctx.translate(bird.x + bird.w/2, bird.y + bird.h/2);
+        bird.angle = Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.v * 0.05));
+        ctx.rotate(bird.angle);
+        
+        // Рисуем птичку (тело)
+        ctx.fillStyle = '#f7941d';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, bird.w/2, bird.h/2, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 2; ctx.stroke();
+        
+        // Глаз
+        ctx.fillStyle = 'white';
+        ctx.beginPath(); ctx.arc(10, -5, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath(); ctx.arc(12, -5, 2, 0, Math.PI*2); ctx.fill();
+        
+        // Крыло
+        ctx.fillStyle = 'orange';
+        ctx.beginPath();
+        ctx.ellipse(-10, 2, 10, 6, (Math.sin(frame*0.2)), 0, Math.PI*2);
+        ctx.fill(); ctx.stroke();
+        
+        ctx.restore();
     }
 
     function loop() {
-        if (!gameRunning) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Небо
+        ctx.fillStyle = '#70c5ce';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Птица
-        bird.velocity += bird.gravity;
-        bird.y += bird.velocity;
-        ctx.fillStyle = "yellow";
-        ctx.fillRect(bird.x, bird.y, bird.w, bird.h);
+        if (gameActive) {
+            bird.v += bird.g;
+            bird.y += bird.v;
 
-        // Препятствия
-        if (frame % 100 === 0) {
-            let space = 150;
-            let topH = Math.random() * (canvas.height / 2);
-            pipes.push({ x: canvas.width, top: topH, bottom: canvas.height - topH - space });
+            if (frame % 100 === 0) {
+                let gap = 180;
+                let top = Math.random() * (canvas.height - gap - 100) + 50;
+                pipes.push({ x: canvas.width, t: top, b: canvas.height - top - gap });
+            }
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                let p = pipes[i];
+                p.x -= 3;
+
+                // Рисуем трубы
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillRect(p.x, 0, 60, p.t);
+                ctx.fillRect(p.x, canvas.height - p.b, 60, p.b);
+                ctx.strokeStyle = 'black'; ctx.strokeRect(p.x, 0, 60, p.t); ctx.strokeRect(p.x, canvas.height - p.b, 60, p.b);
+
+                // Коллизия
+                if (bird.x + bird.w > p.x && bird.x < p.x + 60) {
+                    if (bird.y < p.t || bird.y + bird.h > canvas.height - p.b) {
+                        die();
+                    }
+                }
+
+                if (p.x + 60 < 0) { pipes.splice(i, 1); score++; playSfx(800); }
+            }
+
+            if (bird.y + bird.h > canvas.height || bird.y < 0) die();
+            
+            frame++;
         }
 
-        pipes.forEach((p, i) => {
-            p.x -= 3;
-            ctx.fillStyle = "green";
-            ctx.fillRect(p.x, 0, 50, p.top);
-            ctx.fillRect(p.x, canvas.height - p.bottom, 50, p.bottom);
+        drawBird();
 
-            if (p.x + 50 < 0) { pipes.splice(i, 1); score++; }
-            
-            // Коллизия
-            if (bird.x < p.x + 50 && bird.x + bird.w > p.x && (bird.y < p.top || bird.y + bird.h > canvas.height - p.bottom)) {
-                gameOver();
-            }
-        });
+        // Счет
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 40px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(score, canvas.width/2, 80);
 
-        if (bird.y + bird.h > canvas.height || bird.y < 0) gameOver();
-
-        ctx.fillStyle = "black"; ctx.font = "30px Arial";
-        ctx.fillText(score, 20, 50);
-
-        frame++;
         requestAnimationFrame(loop);
     }
 
-    function gameOver() {
-        gameRunning = false;
-        saveScore(score);
-        showLeaderboard();
+    function die() {
+        gameActive = false;
+        playSfx(100, 'sawtooth');
+        title.innerText = "СЧЕТ: " + score;
+        startBtn.innerText = "ЕЩЕ РАЗ";
+        overlay.style.display = 'flex';
     }
 
-    window.addEventListener('keydown', (e) => { if (e.code === 'Space') bird.velocity = bird.lift; });
-    canvas.addEventListener('touchstart', () => { bird.velocity = bird.lift; });
-
-    // Работа с результатами
-    function saveScore(s) {
-        let leaders = JSON.parse(localStorage.getItem('leaders') || "[]");
-        const name = localStorage.getItem('dag_bird_name');
-        leaders.push({ name, score: s });
-        leaders.sort((a, b) => b.score - a.score);
-        localStorage.setItem('leaders', JSON.stringify(leaders.slice(0, 5))); // Топ-5
-    }
-
-    function showLeaderboard() {
-        const list = document.getElementById('leader-list');
-        const leaders = JSON.parse(localStorage.getItem('leaders') || "[]");
-        list.innerHTML = leaders.map((l, i) => `<div class="score-item"><span>${i+1}. ${l.name}</span><b>${l.score}</b></div>`).join('');
-        document.getElementById('leaderboard').classList.add('active');
-    }
-
-    function closeLeaderboard() {
-        document.getElementById('leaderboard').classList.remove('active');
-        gameRunning = true; resetGame(); loop();
-    }
+    loop();
 </script>
 </body>
 </html>
