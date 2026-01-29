@@ -3,26 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DAG Bird Final</title>
+    <title>DAG Bird Premium</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #70c5ce; font-family: sans-serif; touch-action: manipulation; }
+        body { margin: 0; overflow: hidden; background: #70c5ce; font-family: 'Arial', sans-serif; touch-action: manipulation; }
         canvas { display: block; }
-        #overlay {
+        
+        #overlay, #leaderboard-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.7); display: flex; flex-direction: column;
             align-items: center; justify-content: center; z-index: 20; color: white;
         }
-        input { padding: 15px; border-radius: 10px; border: none; width: 220px; font-size: 18px; text-align: center; margin-bottom: 10px; }
-        button { padding: 15px 30px; background: #f7941d; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; }
+
+        #leaderboard-screen { display: none; z-index: 30; }
+
+        .menu-card {
+            background: rgba(255, 255, 255, 0.95); color: #333; padding: 30px; 
+            border-radius: 25px; text-align: center; width: 260px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: 4px solid #f7941d;
+        }
+
+        h1 { margin: 0 0 20px 0; color: #f7941d; font-size: 36px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        input { 
+            padding: 12px; border: 2px solid #ddd; border-radius: 12px; 
+            width: 90%; font-size: 16px; margin-bottom: 20px; text-align: center; outline: none;
+        }
+
+        .btn-group { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+
+        button {
+            padding: 15px; border: none; border-radius: 12px;
+            font-size: 18px; font-weight: bold; cursor: pointer;
+            transition: 0.2s; color: white; text-transform: uppercase;
+        }
+
+        button:active { transform: scale(0.95); }
+
+        .btn-main { background: #f7941d; box-shadow: 0 5px 0 #d67d16; }
+        .btn-alt { background: #2ecc71; box-shadow: 0 5px 0 #27ae60; }
+
+        .score-list { width: 100%; margin: 15px 0; text-align: left; }
+        .score-item { 
+            display: flex; justify-content: space-between; 
+            padding: 10px 5px; border-bottom: 1px solid #eee; font-size: 18px;
+        }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 id="title">DAG BIRD</h1>
-    <input type="text" id="nick-input" placeholder="Ваш ник..." maxlength="12">
-    <button id="start-btn">ИГРАТЬ</button>
+    <div class="menu-card">
+        <h1 id="title">DAG BIRD</h1>
+        <div id="reg-section">
+            <input type="text" id="nick-input" placeholder="ТВОЙ НИК" maxlength="12">
+        </div>
+        <div class="btn-group">
+            <button class="btn-main" id="start-btn">ИГРАТЬ</button>
+            <button class="btn-alt" onclick="showLeaderboard()">РЕЙТИНГ</button>
+        </div>
+    </div>
+</div>
+
+<div id="leaderboard-screen">
+    <div class="menu-card">
+        <h1>ТОП-5</h1>
+        <div id="score-container" class="score-list"></div>
+        <button class="btn-main" onclick="hideLeaderboard()">НАЗАД</button>
+    </div>
 </div>
 
 <canvas id="game"></canvas>
@@ -36,12 +84,13 @@
     const overlay = document.getElementById('overlay');
     const nickInput = document.getElementById('nick-input');
     const startBtn = document.getElementById('start-btn');
-    const title = document.getElementById('title');
 
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // --- ЗВУКИ ---
+    let bird, pipes, clouds, score, frame, gameActive = false;
+
+    // Звуки
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSfx(f, type = 'sine') {
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -54,41 +103,42 @@
         o.start(); o.stop(audioCtx.currentTime + 0.1);
     }
 
-    // --- ПАРАМЕТРЫ ИГРЫ ---
-    let bird, pipes, score, frame, gameActive = false;
-    
-    // Проверка ника в памяти
-    if (localStorage.getItem('dag_nick')) {
-        nickInput.style.display = 'none';
-    }
-
-    function reset() {
-        bird = { x: 50, y: canvas.height/2, w: 40, h: 30, v: 0, g: 0.5, jump: -8, angle: 0 };
-        pipes = [];
-        score = 0;
-        frame = 0;
-    }
+    if (localStorage.getItem('dag_nick')) document.getElementById('reg-section').style.display = 'none';
 
     function start() {
-        if (nickInput.style.display !== 'none') {
+        if (document.getElementById('reg-section').style.display !== 'none') {
             const n = nickInput.value.trim();
             if (n.length < 2) return alert("Ник слишком короткий!");
             localStorage.setItem('dag_nick', n);
         }
-        playSfx(500);
         overlay.style.display = 'none';
         reset();
         gameActive = true;
+        playSfx(500);
     }
 
     startBtn.onclick = start;
 
-    function jump() {
-        if (gameActive) {
-            bird.v = bird.jump;
-            playSfx(400);
-        }
+    function showLeaderboard() {
+        const list = JSON.parse(localStorage.getItem('dag_scores') || "[]");
+        document.getElementById('score-container').innerHTML = list.map((s, i) => 
+            `<div class="score-item"><span>${i+1}. ${s.name}</span><b>${s.score}</b></div>`).join('') || "Нет данных";
+        document.getElementById('leaderboard-screen').style.display = 'flex';
     }
+
+    function hideLeaderboard() { document.getElementById('leaderboard-screen').style.display = 'none'; }
+
+    function reset() {
+        bird = { x: 60, y: canvas.height/2, w: 44, h: 32, v: 0, g: 0.5, jump: -8, angle: 0 };
+        pipes = [];
+        clouds = [
+            {x: 50, y: 50, s: 0.5}, {x: 200, y: 120, s: 0.8}, {x: 400, y: 80, s: 0.6}
+        ];
+        score = 0;
+        frame = 0;
+    }
+
+    function jump() { if (gameActive) { bird.v = bird.jump; playSfx(440); } }
 
     window.onkeydown = (e) => { if (e.code === 'Space') jump(); };
     canvas.ontouchstart = (e) => { e.preventDefault(); jump(); };
@@ -96,93 +146,91 @@
     function drawBird() {
         ctx.save();
         ctx.translate(bird.x + bird.w/2, bird.y + bird.h/2);
-        bird.angle = Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.v * 0.05));
+        bird.angle = Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.v * 0.06));
         ctx.rotate(bird.angle);
-        
-        // Рисуем птичку (тело)
+
+        // Тело
         ctx.fillStyle = '#f7941d';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, bird.w/2, bird.h/2, 0, 0, Math.PI*2);
-        ctx.fill();
-        ctx.strokeStyle = 'black'; ctx.lineWidth = 2; ctx.stroke();
-        
+        ctx.beginPath(); ctx.ellipse(0, 0, bird.w/2, bird.h/2, 0, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+
         // Глаз
         ctx.fillStyle = 'white';
-        ctx.beginPath(); ctx.arc(10, -5, 5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(12, -6, 7, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = 'black';
-        ctx.beginPath(); ctx.arc(12, -5, 2, 0, Math.PI*2); ctx.fill();
-        
+        ctx.beginPath(); ctx.arc(14, -6, 3, 0, Math.PI*2); ctx.fill();
+
+        // Клюв
+        ctx.fillStyle = '#ff5722';
+        ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(28, 5); ctx.lineTo(15, 10); ctx.fill(); ctx.stroke();
+
         // Крыло
-        ctx.fillStyle = 'orange';
-        ctx.beginPath();
-        ctx.ellipse(-10, 2, 10, 6, (Math.sin(frame*0.2)), 0, Math.PI*2);
-        ctx.fill(); ctx.stroke();
-        
+        ctx.fillStyle = '#ff9800';
+        let wingMove = Math.sin(frame * 0.2) * 5;
+        ctx.beginPath(); ctx.ellipse(-12, 5, 12, 8 + wingMove, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
         ctx.restore();
     }
 
     function loop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         // Небо
-        ctx.fillStyle = '#70c5ce';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        skyGrad.addColorStop(0, '#4facfe'); skyGrad.addColorStop(1, '#00f2fe');
+        ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Облака
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        clouds.forEach(c => {
+            c.x -= c.s;
+            if (c.x < -100) c.x = canvas.width + 100;
+            ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, Math.PI*2); 
+            ctx.arc(c.x+25, c.y-10, 25, 0, Math.PI*2); 
+            ctx.arc(c.x+50, c.y, 20, 0, Math.PI*2); ctx.fill();
+        });
 
         if (gameActive) {
-            bird.v += bird.g;
-            bird.y += bird.v;
-
-            if (frame % 100 === 0) {
+            bird.v += bird.g; bird.y += bird.v;
+            if (frame % 90 === 0) {
                 let gap = 180;
-                let top = Math.random() * (canvas.height - gap - 100) + 50;
-                pipes.push({ x: canvas.width, t: top, b: canvas.height - top - gap });
+                let t = Math.random() * (canvas.height - gap - 150) + 75;
+                pipes.push({ x: canvas.width, t: t, b: canvas.height - t - gap });
             }
+            pipes.forEach((p, i) => {
+                p.x -= 3.5;
+                // Трубы с градиентом
+                let pGrad = ctx.createLinearGradient(p.x, 0, p.x + 60, 0);
+                pGrad.addColorStop(0, '#2ecc71'); pGrad.addColorStop(1, '#27ae60');
+                ctx.fillStyle = pGrad;
+                ctx.fillRect(p.x, 0, 60, p.t); ctx.strokeRect(p.x, 0, 60, p.t);
+                ctx.fillRect(p.x, canvas.height - p.b, 60, p.b); ctx.strokeRect(p.x, canvas.height - p.b, 60, p.b);
 
-            for (let i = pipes.length - 1; i >= 0; i--) {
-                let p = pipes[i];
-                p.x -= 3;
-
-                // Рисуем трубы
-                ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(p.x, 0, 60, p.t);
-                ctx.fillRect(p.x, canvas.height - p.b, 60, p.b);
-                ctx.strokeStyle = 'black'; ctx.strokeRect(p.x, 0, 60, p.t); ctx.strokeRect(p.x, canvas.height - p.b, 60, p.b);
-
-                // Коллизия
-                if (bird.x + bird.w > p.x && bird.x < p.x + 60) {
-                    if (bird.y < p.t || bird.y + bird.h > canvas.height - p.b) {
-                        die();
-                    }
+                if (bird.x + bird.w - 8 > p.x && bird.x + 8 < p.x + 60) {
+                    if (bird.y + 8 < p.t || bird.y + bird.h - 8 > canvas.height - p.b) die();
                 }
-
-                if (p.x + 60 < 0) { pipes.splice(i, 1); score++; playSfx(800); }
-            }
-
+                if (p.x < bird.x && !p.passed) { score++; p.passed = true; playSfx(800); }
+            });
+            pipes = pipes.filter(p => p.x > -100);
             if (bird.y + bird.h > canvas.height || bird.y < 0) die();
-            
             frame++;
         }
 
         drawBird();
-
-        // Счет
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 40px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(score, canvas.width/2, 80);
-
+        ctx.fillStyle = 'white'; ctx.font = 'bold 50px Arial'; ctx.textAlign = 'center';
+        if (gameActive) { ctx.lineWidth = 6; ctx.strokeText(score, canvas.width/2, 100); ctx.fillText(score, canvas.width/2, 100); }
         requestAnimationFrame(loop);
     }
 
     function die() {
-        gameActive = false;
-        playSfx(100, 'sawtooth');
-        title.innerText = "СЧЕТ: " + score;
-        startBtn.innerText = "ЕЩЕ РАЗ";
+        gameActive = false; playSfx(100, 'sawtooth');
+        let list = JSON.parse(localStorage.getItem('dag_scores') || "[]");
+        list.push({name: localStorage.getItem('dag_nick') || "Аноним", score: score});
+        list.sort((a,b) => b.score - a.score);
+        localStorage.setItem('dag_scores', JSON.stringify(list.slice(0, 5)));
+        document.getElementById('title').innerText = "СЧЕТ: " + score;
         overlay.style.display = 'flex';
     }
 
-    loop();
+    reset(); loop();
 </script>
 </body>
 </html>
