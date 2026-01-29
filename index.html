@@ -158,7 +158,187 @@
                 bet: bet
             }));
             
-            alert("Птица врезалась! Ставка сгорела.");
+            alert("Птица врезалас<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DAG Bird Pro</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #4ec0ca; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.7); color: white; z-index: 200; }
+        .menu-box { background: #fff; color: #333; padding: 25px; border-radius: 20px; text-align: center; width: 80%; max-width: 300px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        input { width: 90%; padding: 12px; margin: 15px 0; border-radius: 10px; border: 2px solid #ddd; font-size: 20px; text-align: center; }
+        button { background: #f7941d; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 18px; width: 100%; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
+        #game-info { position: absolute; top: 30px; width: 100%; text-align: center; color: white; font-size: 26px; font-weight: 900; text-shadow: 2px 2px 0 #000; pointer-events: none; display: none; z-index: 100; }
+        #cashout-btn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); background: #2ecc71; color: white; border: none; padding: 20px 40px; border-radius: 50px; font-size: 20px; font-weight: bold; display: none; z-index: 150; box-shadow: 0 8px 0 #27ae60; }
+    </style>
+</head>
+<body>
+
+    <div id="game-info">
+        <span style="font-size: 14px; opacity: 0.8;">ВЫИГРЫШ:</span><br>
+        <span id="current-win">0</span> ⭐ <br>
+        <span id="mult-val" style="color: #f1c40f;">x1.00</span>
+    </div>
+
+    <button id="cashout-btn" onclick="cashOut()">💸 ЗАБРАТЬ ⭐</button>
+
+    <div id="ui">
+        <div class="menu-box">
+            <h1 style="margin: 0; color: #f7941d;">DAG BIRD</h1>
+            <p style="font-size: 14px;">Лети между трубами и умножай ставку!</p>
+            <input type="number" id="bet-input" value="10" min="5">
+            <button onclick="startGame()">ПОЛЕТЕЛИ!</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const cashoutBtn = document.getElementById('cashout-btn');
+        const gameInfo = document.getElementById('game-info');
+        const ui = document.getElementById('ui');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let bet = 0, multiplier = 1.0, isPlaying = false;
+        let bird, pipes, frame, clouds = [];
+
+        // Создаем облака для фона
+        for(let i=0; i<5; i++) clouds.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height/2, s: 0.5+Math.random()});
+
+        function startGame() {
+            bet = parseInt(document.getElementById('bet-input').value);
+            if (isNaN(bet) || bet < 5) return alert("Минимум 5 ⭐");
+            ui.style.display = 'none';
+            cashoutBtn.style.display = 'block';
+            gameInfo.style.display = 'block';
+            bird = { x: 70, y: canvas.height / 2, v: 0, r: 18 };
+            pipes = []; multiplier = 1.0; frame = 0; isPlaying = true;
+            animate();
+        }
+
+        function drawBird() {
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+            ctx.rotate(Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.v/10)));
+            // Тело
+            ctx.fillStyle = "#f1c40f";
+            ctx.beginPath();
+            ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.stroke();
+            // Глаз
+            ctx.fillStyle = "white";
+            ctx.beginPath(); ctx.arc(8, -5, 6, 0, Math.PI*2); ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "black";
+            ctx.beginPath(); ctx.arc(10, -5, 2, 0, Math.PI*2); ctx.fill();
+            // Клюв
+            ctx.fillStyle = "#e67e22";
+            ctx.beginPath();
+            ctx.moveTo(12, 2); ctx.lineTo(22, 5); ctx.lineTo(12, 10); ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawPipe(p) {
+            const grd = ctx.createLinearGradient(p.x, 0, p.x + 50, 0);
+            grd.addColorStop(0, "#2ecc71"); grd.addColorStop(1, "#27ae60");
+            ctx.fillStyle = grd;
+            // Верхняя
+            ctx.fillRect(p.x, 0, 52, p.top);
+            ctx.strokeRect(p.x, 0, 52, p.top);
+            ctx.fillRect(p.x - 4, p.top - 20, 60, 20); // Шапка
+            ctx.strokeRect(p.x - 4, p.top - 20, 60, 20);
+            // Нижняя
+            ctx.fillRect(p.x, canvas.height - p.bottom, 52, p.bottom);
+            ctx.strokeRect(p.x, canvas.height - p.bottom, 52, p.bottom);
+            ctx.fillRect(p.x - 4, canvas.height - p.bottom, 60, 20); // Шапка
+            ctx.strokeRect(p.x - 4, canvas.height - p.bottom, 60, 20);
+        }
+
+        function animate() {
+            if (!isPlaying) return;
+            ctx.fillStyle = "#4ec0ca";
+            ctx.fillRect(0,0,canvas.width, canvas.height);
+            
+            // Облака
+            ctx.fillStyle = "white";
+            clouds.forEach(c => {
+                c.x -= c.s; if(c.x < -100) c.x = canvas.width + 100;
+                ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, Math.PI*2); ctx.arc(c.x+15, c.y-10, 20, 0, Math.PI*2); ctx.arc(c.x+30, c.y, 20, 0, Math.PI*2); ctx.fill();
+            });
+
+            bird.v += 0.25; bird.y += bird.v;
+            if (frame % 90 === 0) {
+                const gap = 170, min = 100;
+                const h = Math.random() * (canvas.height - gap - min * 2) + min;
+                pipes.push({ x: canvas.width, top: h, bottom: canvas.height - h - gap });
+            }
+
+            pipes.forEach((p, i) => {
+                p.x -= 3.5;
+                drawPipe(p);
+                if (bird.x + bird.r > p.x && bird.x - bird.r < p.x + 52) {
+                    if (bird.y - bird.r < p.top || bird.y + bird.r > canvas.height - p.bottom) gameOver();
+                }
+                if (p.x < bird.x && !p.passed) { 
+                    p.passed = true; multiplier += 0.20; updateUI(); 
+                    tg.HapticFeedback.impactOccurred('medium');
+                }
+            });
+            pipes = pipes.filter(p => p.x > -60);
+            if (bird.y + bird.r > canvas.height || bird.y - bird.r < 0) gameOver();
+            drawBird(); frame++;
+            requestAnimationFrame(animate);
+        }
+
+        function updateUI() {
+            document.getElementById('mult-val').innerText = "x" + multiplier.toFixed(2);
+            document.getElementById('current-win').innerText = Math.floor(bet * multiplier);
+        }
+
+        function cashOut() {
+            if (!isPlaying) return;
+            const finalWin = Math.floor(bet * multiplier);
+            isPlaying = false;
+            tg.sendData(JSON.stringify({ action: "win", bet: bet, amount: finalWin }));
+            alert(`КРАСАВА! Забрал ${finalWin} ⭐`);
+            location.reload();
+        }
+
+        function gameOver() {
+            if (!isPlaying) return;
+            isPlaying = false;
+            tg.HapticFeedback.notificationOccurred('error');
+            tg.sendData(JSON.stringify({ action: "loss", bet: bet }));
+            alert("БАБАХ! Попробуй еще раз.");
+            location.reload();
+        }
+
+        // Управление: Пробел, Клик, Тап
+        const inputTrigger = (e) => {
+            if(isPlaying) { bird.v = -5.5; e.preventDefault(); }
+            if(e.code === 'Space') e.preventDefault();
+        };
+        window.addEventListener('keydown', (e) => { if(e.code === 'Space') inputTrigger(e); });
+        window.addEventListener('mousedown', inputTrigger);
+        window.addEventListener('touchstart', inputTrigger, {passive: false});
+
+    </script>
+</body>
+</html>ь! Ставка сгорела.");
             location.reload();
         }
 
