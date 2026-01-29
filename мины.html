@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DAG Mines</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 300px; margin: 20px auto; }
+        .cell { width: 55px; height: 55px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; transition: 0.2s; }
+        .cell.open { background: #444; cursor: default; }
+        .cell.bomb { background: #e74c3c; }
+        .cell.gem { background: #2ecc71; }
+        .status { margin-bottom: 20px; font-size: 18px; color: #f7941d; }
+        button { padding: 15px 30px; background: #f7941d; border: none; border-radius: 12px; color: white; font-weight: bold; font-size: 18px; }
+        .multiplier { font-size: 24px; margin: 10px; color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <h1>💣 МИНЫ</h1>
+    <div class="status" id="stat">Нажми СТАРТ (1 энергия)</div>
+    <div class="multiplier" id="mult">Множитель: x1.0</div>
+    <div class="grid" id="grid"></div>
+    <button id="action-btn" onclick="startGame()">ИГРАТЬ</button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let cells = [];
+        let bombs = [];
+        let gameOver = true;
+        let gemsFound = 0;
+        const totalBombs = 3;
+
+        function startGame() {
+            // В идеале тут должен быть запрос к боту на проверку энергии
+            document.getElementById('grid').innerHTML = '';
+            document.getElementById('stat').innerText = "Найди алмазы!";
+            document.getElementById('action-btn').style.display = 'none';
+            document.getElementById('mult').innerText = "Множитель: x1.0";
+            gameOver = false;
+            gemsFound = 0;
+            bombs = [];
+            cells = [];
+
+            // Генерируем бомбы
+            while(bombs.length < totalBombs) {
+                let r = Math.floor(Math.random() * 25);
+                if(!bombs.includes(r)) bombs.push(r);
+            }
+
+            for(let i=0; i<25; i++) {
+                let cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => openCell(i, cell);
+                document.getElementById('grid').appendChild(cell);
+                cells.push(cell);
+            }
+        }
+
+        function openCell(idx, el) {
+            if(gameOver || el.classList.contains('open')) return;
+            el.classList.add('open');
+
+            if(bombs.includes(idx)) {
+                el.classList.add('bomb');
+                el.innerText = '💣';
+                die();
+            } else {
+                el.classList.add('gem');
+                el.innerText = '💎';
+                gemsFound++;
+                let m = (1 + gemsFound * 0.2).toFixed(1);
+                document.getElementById('mult').innerText = "Множитель: x" + m;
+                if(gemsFound === 22) win();
+            }
+        }
+
+        function die() {
+            gameOver = true;
+            document.getElementById('stat').innerText = "БАБАХ! Ты проиграл.";
+            document.getElementById('action-btn').innerText = "ПОПРОБОВАТЬ СНОВА";
+            document.getElementById('action-btn').style.display = 'inline-block';
+            tg.HapticFeedback.notificationOccurred('error');
+        }
+
+        function win() {
+            gameOver = true;
+            document.getElementById('stat').innerText = "ПОБЕДА! Все алмазы твои!";
+            document.getElementById('action-btn').style.display = 'inline-block';
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+    </script>
+</body>
+</html>
