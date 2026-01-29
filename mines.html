@@ -3,50 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DAG Mines</title>
+    <title>DAG Mines - Bet & Win</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 300px; margin: 20px auto; }
-        .cell { width: 55px; height: 55px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; transition: 0.2s; }
-        .cell.open { background: #444; cursor: default; }
-        .cell.bomb { background: #e74c3c; }
-        .cell.gem { background: #2ecc71; }
-        .status { margin-bottom: 20px; font-size: 18px; color: #f7941d; }
-        button { padding: 15px 30px; background: #f7941d; border: none; border-radius: 12px; color: white; font-weight: bold; font-size: 18px; }
-        .multiplier { font-size: 24px; margin: 10px; color: #2ecc71; }
+        body { background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .balance-area { background: #222; padding: 10px; border-radius: 10px; margin-bottom: 20px; color: #f7941d; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 320px; margin: 20px auto; }
+        .cell { width: 58px; height: 58px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; border: 1px solid #444; }
+        .cell.open.gem { background: #2ecc71; border-color: #27ae60; }
+        .cell.open.bomb { background: #e74c3c; border-color: #c0392b; }
+        .controls { background: #222; padding: 15px; border-radius: 15px; max-width: 320px; margin: 0 auto; }
+        input { width: 80%; padding: 10px; margin: 10px 0; background: #333; border: 1px solid #444; color: white; border-radius: 8px; text-align: center; }
+        button { width: 100%; padding: 15px; margin: 5px 0; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .btn-start { background: #f7941d; color: white; }
+        .btn-cashout { background: #2ecc71; color: white; display: none; }
     </style>
 </head>
 <body>
-    <h1>💣 МИНЫ</h1>
-    <div class="status" id="stat">Нажми СТАРТ (1 энергия)</div>
-    <div class="multiplier" id="mult">Множитель: x1.0</div>
-    <div class="grid" id="grid"></div>
-    <button id="action-btn" onclick="startGame()">ИГРАТЬ</button>
+    <div class="balance-area">ВАША СТАВКА: <span id="current-bet">0</span> ⭐</div>
+    
+    <div class="controls" id="setup-area">
+        <label>Ставка (в звездах):</label><br>
+        <input type="number" id="bet-input" value="10" min="1">
+        <button class="btn-start" onclick="startGame()">ИГРАТЬ</button>
+    </div>
+
+    <div id="game-area" style="display:none;">
+        <div id="mult-display" style="font-size: 20px; color: #2ecc71; margin-bottom: 10px;">Множитель: x1.00</div>
+        <div class="grid" id="grid"></div>
+        <button id="cashout-btn" class="btn-cashout" onclick="cashOut()">ЗАБРАТЬ <span id="win-amount">0</span> ⭐</button>
+    </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let cells = [];
+        let bet = 0;
         let bombs = [];
-        let gameOver = true;
         let gemsFound = 0;
-        const totalBombs = 3;
+        let isGameOver = false;
 
         function startGame() {
-            // В идеале тут должен быть запрос к боту на проверку энергии
-            document.getElementById('grid').innerHTML = '';
-            document.getElementById('stat').innerText = "Найди алмазы!";
-            document.getElementById('action-btn').style.display = 'none';
-            document.getElementById('mult').innerText = "Множитель: x1.0";
-            gameOver = false;
-            gemsFound = 0;
-            bombs = [];
-            cells = [];
+            bet = parseInt(document.getElementById('bet-input').value);
+            if (isNaN(bet) || bet <= 0) return alert("Введите ставку!");
 
-            // Генерируем бомбы
-            while(bombs.length < totalBombs) {
+            // Скрываем настройки, показываем поле
+            document.getElementById('setup-area').style.display = 'none';
+            document.getElementById('game-area').style.display = 'block';
+            document.getElementById('current-bet').innerText = bet;
+            
+            initGrid();
+        }
+
+        function initGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            bombs = [];
+            gemsFound = 0;
+            isGameOver = false;
+
+            while(bombs.length < 3) {
                 let r = Math.floor(Math.random() * 25);
                 if(!bombs.includes(r)) bombs.push(r);
             }
@@ -55,42 +71,56 @@
                 let cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.onclick = () => openCell(i, cell);
-                document.getElementById('grid').appendChild(cell);
-                cells.push(cell);
+                grid.appendChild(cell);
             }
         }
 
         function openCell(idx, el) {
-            if(gameOver || el.classList.contains('open')) return;
+            if(isGameOver || el.classList.contains('open')) return;
             el.classList.add('open');
 
             if(bombs.includes(idx)) {
                 el.classList.add('bomb');
                 el.innerText = '💣';
-                die();
+                gameOver(false);
             } else {
                 el.classList.add('gem');
                 el.innerText = '💎';
                 gemsFound++;
-                let m = (1 + gemsFound * 0.2).toFixed(1);
-                document.getElementById('mult').innerText = "Множитель: x" + m;
-                if(gemsFound === 22) win();
+                updateMultiplier();
+                document.getElementById('cashout-btn').style.display = 'block';
+                tg.HapticFeedback.impactOccurred('light');
             }
         }
 
-        function die() {
-            gameOver = true;
-            document.getElementById('stat').innerText = "БАБАХ! Ты проиграл.";
-            document.getElementById('action-btn').innerText = "ПОПРОБОВАТЬ СНОВА";
-            document.getElementById('action-btn').style.display = 'inline-block';
-            tg.HapticFeedback.notificationOccurred('error');
+        function updateMultiplier() {
+            // Коэффициент растет с каждым алмазом
+            let mult = (1 + (gemsFound * 0.25)).toFixed(2);
+            document.getElementById('mult-display').innerText = "Множитель: x" + mult;
+            document.getElementById('win-amount').innerText = Math.floor(bet * mult);
         }
 
-        function win() {
-            gameOver = true;
-            document.getElementById('stat').innerText = "ПОБЕДА! Все алмазы твои!";
-            document.getElementById('action-btn').style.display = 'inline-block';
+        function cashOut() {
+            if(isGameOver) return;
+            let finalWin = document.getElementById('win-amount').innerText;
+            isGameOver = true;
+            
             tg.HapticFeedback.notificationOccurred('success');
+            alert("Вы забрали " + finalWin + " звезд!");
+            
+            // ОТПРАВКА ДАННЫХ БОТУ
+            tg.sendData(JSON.stringify({action: "win", amount: finalWin, bet: bet}));
+            tg.close();
+        }
+
+        function gameOver(win) {
+            isGameOver = true;
+            tg.HapticFeedback.notificationOccurred('error');
+            setTimeout(() => {
+                alert("Бомба! Ставка " + bet + " звезд сгорела.");
+                tg.sendData(JSON.stringify({action: "loss", bet: bet}));
+                tg.close();
+            }, 500);
         }
     </script>
 </body>
