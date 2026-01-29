@@ -1,144 +1,217 @@
-import asyncio
-import logging
-import os
-import json
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiocryptopay import AioCryptoPay
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import BotCommand, WebAppInfo, KeyboardButton, ContentType
-
-# --- НАСТРОЙКИ ---
-BOT_TOKEN = "8508733334:AAG2B0F8KDlI853OV7D-nQvaJjMSJn_gAaI"
-CRYPTO_TOKEN = "521815:AAlbgxr1GMcNTAJcgPDpl8VUjZ0uCwKXkNS"
-ADMIN_ID = 7248279200 
-SUPPORT_USERNAME = "Dag_stars_helper"
-BASE_URL = "https://exstazy57.github.io/index.html" 
-
-DATA_FILE = "users_data.json"
-USERS_FILE = "users_db.txt"
-PRICE_PER_STAR_RUB = 1.4  
-USD_RATE = 95.0            
-
-logging.basicConfig(level=logging.INFO)
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-crypto = AioCryptoPay(token=CRYPTO_TOKEN)
-
-# --- СИСТЕМА ДАННЫХ ---
-def load_data():
-    if not os.path.exists(DATA_FILE): return {}
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f: return json.load(f)
-    except: return {}
-
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-def update_balance(user_id, amount):
-    data = load_data()
-    uid = str(user_id)
-    if uid not in data:
-        data[uid] = {"balance": 0}
-    data[uid]["balance"] += int(amount)
-    save_data(data)
-    return data[uid]["balance"]
-
-def get_balance(user_id):
-    data = load_data()
-    return data.get(str(user_id), {}).get("balance", 0)
-
-# --- КЛАВИАТУРА (ИГРЫ ВСЕГДА ВИДНЫ) ---
-def get_main_menu():
-    builder = ReplyKeyboardBuilder()
-    builder.row(KeyboardButton(text="💎 КУПИТЬ ЗВЕЗДЫ"), KeyboardButton(text="💰 МОЙ БАЛАНС"))
-    builder.row(
-        KeyboardButton(text="🐦 DAG BIRD", web_app=WebAppInfo(url=f"{BASE_URL}/index.html?v=8")),
-        KeyboardButton(text="💣 МИНЫ", web_app=WebAppInfo(url=f"{BASE_URL}/mines.html?v=8"))
-    )
-    return builder.as_markup(resize_keyboard=True)
-
-# --- ХЕНДЛЕРЫ ---
-
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    update_balance(message.from_user.id, 0)
-    await message.answer(
-        "🌟 **Добро пожаловать в DAG Stars!**\n\n"
-        "Выбирайте игру или пополняйте баланс для ставок.",
-        reply_markup=get_main_menu()
-    )
-
-@dp.message(F.text == "💰 МОЙ БАЛАНС")
-async def show_balance(message: types.Message):
-    bal = get_balance(message.from_user.id)
-    await message.answer(f"💰 Твой баланс: **{bal} ⭐**")
-
-@dp.message(F.text == "💎 КУПИТЬ ЗВЕЗДЫ")
-async def shop_menu(message: types.Message):
-    builder = InlineKeyboardBuilder()
-    for opt in [50, 100, 250, 500]:
-        price = round(opt * PRICE_PER_STAR_RUB, 1)
-        builder.row(types.InlineKeyboardButton(text=f"{opt} ⭐ — {price}₽", callback_data=f"buy_{opt}_{price}"))
-    await message.answer("🛒 Выберите пакет звезд:", reply_markup=builder.as_markup())
-
-# --- ПРОВЕРКА БАЛАНСА ПРИ ЗАВЕРШЕНИИ ИГРЫ ---
-@dp.message(F.content_type == ContentType.WEB_APP_DATA)
-async def handle_game_end(message: types.Message):
-    try:
-        res = json.loads(message.web_app_data.data)
-        bet = int(res.get("bet", 0))
-        action = res.get("action")
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DAG BIRD PREMIUM</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #202040; font-family: 'Arial', sans-serif; touch-action: none; }
+        canvas { display: block; }
         
-        current_bal = get_balance(message.from_user.id)
+        /* Стильное меню */
+        #ui { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            background: linear-gradient(rgba(0,0,0,0.8), rgba(32,32,64,0.9)); z-index: 1000; 
+        }
+        .menu-box { 
+            background: white; padding: 30px; border-radius: 25px; text-align: center; 
+            width: 280px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); border: 4px solid #f7941d;
+        }
+        
+        input { width: 80%; padding: 15px; margin: 15px 0; border-radius: 12px; border: 2px solid #ddd; font-size: 22px; text-align: center; outline: none; }
+        button#start-btn { 
+            background: #f7941d; color: white; border: none; padding: 18px; 
+            border-radius: 12px; font-weight: bold; width: 100%; font-size: 20px; cursor: pointer;
+            box-shadow: 0 5px 0 #c37517;
+        }
+        button#start-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #c37517; }
+        
+        #game-info { 
+            position: absolute; top: 40px; width: 100%; text-align: center; 
+            color: #fff; font-size: 28px; font-weight: 900; text-shadow: 3px 3px 0 #000; 
+            display: none; z-index: 100; pointer-events: none;
+        }
+        
+        #cashout-btn { 
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); 
+            background: #2ecc71; color: white; border: none; padding: 22px 50px; 
+            border-radius: 60px; font-size: 22px; font-weight: bold; 
+            display: none; z-index: 1500; box-shadow: 0 8px 0 #1e8449; transition: 0.1s;
+        }
+        #cashout-btn:active { transform: translateX(-50%) translateY(4px); box-shadow: 0 4px 0 #1e8449; }
+    </style>
+</head>
+<body>
 
-        # САМАЯ ВАЖНАЯ ПРОВЕРКА
-        if current_bal < bet or current_bal <= 0:
-            return await message.answer(
-                f"❌ **Игра не засчитана!**\n\n"
-                f"Твоя ставка: {bet} ⭐\n"
-                f"Твой баланс: {current_bal} ⭐\n"
-                f"Пожалуйста, сначала пополни баланс."
-            )
+    <div id="game-info">
+        <span id="mult-val" style="color: #f1c40f; font-size: 40px;">x1.00</span><br>
+        <span id="current-win">0</span> ⭐
+    </div>
 
-        if action == "win":
-            win = int(res.get("amount", 0))
-            new_bal = update_balance(message.from_user.id, win - bet)
-            await message.answer(f"🎯 **Победа!**\nЗачислено: {win} ⭐\nБаланс: {new_bal} ⭐")
-        elif action == "loss":
-            new_bal = update_balance(message.from_user.id, -bet)
-            await message.answer(f"💥 **Мина!**\nСписано: {bet} ⭐\nБаланс: {new_bal} ⭐")
+    <button id="cashout-btn" onpointerdown="cashOut(event)">💰 ЗАБРАТЬ ВЫИГРЫШ</button>
+
+    <div id="ui">
+        <div class="menu-box">
+            <h1 style="margin: 0; color: #f7941d; font-size: 32px;">DAG BIRD</h1>
+            <p style="color: #666;">Ставка (минимум 10 ⭐)</p>
+            <input type="number" id="bet-input" value="10" min="10">
+            <button id="start-btn" onclick="startGame()">ВЗЛЕТАЕМ!</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.enableClosingConfirmation();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
+        const cashoutBtn = document.getElementById('cashout-btn');
+        const gameInfo = document.getElementById('game-info');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let bet = 0, multiplier = 1.0, isPlaying = false;
+        let bird, pipes = [], frame = 0, particles = [];
+
+        function startGame() {
+            bet = parseInt(document.getElementById('bet-input').value);
+            if (isNaN(bet) || bet < 10) return alert("Минимальная ставка 10 ⭐");
+
+            ui.style.display = 'none';
+            cashoutBtn.style.display = 'block';
+            gameInfo.style.display = 'block';
+
+            bird = { x: 80, y: canvas.height / 2, v: 0, r: 20, angle: 0 };
+            pipes = []; multiplier = 1.0; frame = 0;
+            isPlaying = true;
+            animate();
+        }
+
+        function drawBackground() {
+            // Ночное небо
+            let g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            g.addColorStop(0, '#0f0c29'); g.addColorStop(0.5, '#302b63'); g.addColorStop(1, '#24243e');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-    except Exception as e:
-        logging.error(f"Error: {e}")
+            // Звезды
+            ctx.fillStyle = "white";
+            for(let i=0; i<30; i++) ctx.fillRect((i*137)%canvas.width, (i*251)%canvas.height, 2, 2);
+        }
 
-# (Остальной код оплаты остается без изменений)
-@dp.callback_query(F.data.startswith("buy_"))
-async def create_pay(callback: types.CallbackQuery):
-    _, amt, price = callback.data.split("_")
-    price_usd = round(float(price) / USD_RATE, 2)
-    inv = await crypto.create_invoice(asset='USDT', amount=price_usd)
-    kb = InlineKeyboardBuilder()
-    kb.row(types.InlineKeyboardButton(text="💸 Оплатить", url=inv.bot_invoice_url))
-    kb.row(types.InlineKeyboardButton(text="✅ Проверить", callback_data=f"check_{inv.invoice_id}_{amt}"))
-    await callback.message.edit_text(f"💎 Пополнение: {amt} ⭐\nСумма: {price_usd} USDT", reply_markup=kb.as_markup())
+        function drawBird() {
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+            bird.angle = Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.v/12));
+            ctx.rotate(bird.angle);
 
-@dp.callback_query(F.data.startswith("check_"))
-async def check_pay(callback: types.CallbackQuery):
-    _, inv_id, amt = callback.data.split("_")
-    invs = await crypto.get_invoices(invoice_ids=inv_id)
-    status = invs.status if not isinstance(invs, list) else invs[0].status
-    if status == 'paid':
-        update_balance(callback.from_user.id, amt)
-        await callback.message.edit_text(f"✅ Оплачено! Баланс пополнен на {amt} ⭐")
-    else:
-        await callback.answer("⏳ Оплата не найдена", show_alert=True)
+            // Крыло
+            ctx.fillStyle = "#FFD700";
+            ctx.beginPath(); ctx.ellipse(-10, 0, 12, 8, bird.angle, 0, Math.PI*2); ctx.fill();
+            ctx.stroke();
 
-async def main():
-    await dp.start_polling(bot)
+            // Тело (Птица)
+            ctx.fillStyle = "#f1c40f";
+            ctx.beginPath(); ctx.arc(0, 0, bird.r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = "black"; ctx.lineWidth = 3; ctx.stroke();
 
-if __name__ == "__main__":
-    asyncio.run(main())
+            // Глаз
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(10, -8, 7, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(13, -8, 3, 0, Math.PI*2); ctx.fill();
+
+            // Клюв
+            ctx.fillStyle = "#e67e22";
+            ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(30, 5); ctx.lineTo(15, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        function drawPipes(p) {
+            let g = ctx.createLinearGradient(p.x, 0, p.x + 60, 0);
+            g.addColorStop(0, '#2ecc71'); g.addColorStop(0.5, '#a2fad1'); g.addColorStop(1, '#27ae60');
+            ctx.fillStyle = g;
+            ctx.lineWidth = 3;
+
+            // Верхняя
+            ctx.fillRect(p.x, 0, 60, p.top); ctx.strokeRect(p.x, 0, 60, p.top);
+            ctx.fillRect(p.x-5, p.top-25, 70, 25); ctx.strokeRect(p.x-5, p.top-25, 70, 25);
+
+            // Нижняя
+            ctx.fillRect(p.x, canvas.height - p.bottom, 60, p.bottom); ctx.strokeRect(p.x, canvas.height - p.bottom, 60, p.bottom);
+            ctx.fillRect(p.x-5, canvas.height - p.bottom, 70, 25); ctx.strokeRect(p.x-5, canvas.height - p.bottom, 70, 25);
+        }
+
+        function animate() {
+            if (!isPlaying) return;
+            drawBackground();
+
+            bird.v += 0.3; bird.y += bird.v;
+
+            if (frame % 85 === 0) {
+                let gap = 180, h = Math.random() * (canvas.height - gap - 250) + 120;
+                pipes.push({ x: canvas.width, top: h, bottom: canvas.height - h - gap, passed: false });
+            }
+
+            pipes.forEach(p => {
+                p.x -= 4;
+                drawPipes(p);
+
+                // Коллизия
+                if (bird.x + 15 > p.x && bird.x - 15 < p.x + 60) {
+                    if (bird.y - 15 < p.top || bird.y + 15 > canvas.height - p.bottom) gameOver();
+                }
+
+                if (p.x < bird.x && !p.passed) {
+                    p.passed = true; multiplier += 0.25;
+                    tg.HapticFeedback.impactOccurred('medium');
+                    updateUI();
+                }
+            });
+
+            pipes = pipes.filter(p => p.x > -100);
+            if (bird.y + 20 > canvas.height || bird.y - 20 < 0) gameOver();
+
+            drawBird();
+            frame++;
+            requestAnimationFrame(animate);
+        }
+
+        function updateUI() {
+            document.getElementById('mult-val').innerText = "x" + multiplier.toFixed(2);
+            document.getElementById('current-win').innerText = Math.floor(bet * multiplier);
+        }
+
+        function cashOut(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            if (!isPlaying) return;
+            const win = Math.floor(bet * multiplier);
+            isPlaying = false;
+            tg.sendData(JSON.stringify({ action: "win", bet: bet, amount: win }));
+            tg.HapticFeedback.notificationOccurred('success');
+            setTimeout(() => location.reload(), 100);
+        }
+
+        function gameOver() {
+            if (!isPlaying) return;
+            isPlaying = false;
+            tg.sendData(JSON.stringify({ action: "loss", bet: bet }));
+            tg.HapticFeedback.notificationOccurred('error');
+            alert("ПРОИГРЫШ! Ставка потеряна.");
+            location.reload();
+        }
+
+        const jump = (e) => { 
+            if(isPlaying) { bird.v = -6.5; } 
+            if(e) e.preventDefault();
+        };
+        window.addEventListener('keydown', (e) => { if(e.code === 'Space') jump(e); });
+        canvas.addEventListener('pointerdown', jump);
+    </script>
+</body>
+</html>
