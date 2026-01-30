@@ -3,25 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DAG PLINKO ULTIMATE FAIR</title>
+    <title>DAG PLINKO CENTER WIN</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #0a0e14; font-family: 'Orbitron', sans-serif; color: white; touch-action: none; }
         canvas { display: block; }
         #ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 15px; box-sizing: border-box; }
-        #header { display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
-        .badge { background: rgba(20, 25, 35, 0.9); border: 1px solid #00f2ff; padding: 8px 15px; border-radius: 12px; color: #00f2ff; font-weight: 900; box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
-        #controls { background: #151a21; padding: 20px; border-radius: 20px; pointer-events: auto; border-top: 2px solid #2a303c; box-shadow: 0 -5px 20px rgba(0,0,0,0.5); text-align: center; }
+        .badge { background: rgba(20, 25, 35, 0.9); border: 1px solid #00f2ff; padding: 8px 15px; border-radius: 12px; color: #00f2ff; font-weight: 900; }
+        #controls { background: #151a21; padding: 20px; border-radius: 20px; pointer-events: auto; border-top: 2px solid #2a303c; text-align: center; }
         .input-group { display: flex; background: #000; border: 1px solid #333; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
         input { flex: 1; background: transparent; border: none; color: #fff; padding: 12px; font-size: 18px; text-align: center; font-family: 'Orbitron'; outline: none; }
-        button { padding: 15px; border-radius: 10px; font-size: 16px; font-weight: 900; border: none; font-family: 'Orbitron'; cursor: pointer; text-transform: uppercase; transition: 0.2s; width: 100%; }
-        #btn-play { background: linear-gradient(180deg, #00f2ff, #0077ff); color: #000; box-shadow: 0 0 20px rgba(0, 242, 255, 0.4); margin-bottom: 10px; }
-        #btn-play:active { transform: scale(0.95); }
+        button { padding: 15px; border-radius: 10px; font-size: 16px; font-weight: 900; border: none; font-family: 'Orbitron'; cursor: pointer; text-transform: uppercase; width: 100%; }
+        #btn-play { background: linear-gradient(180deg, #00f2ff, #0077ff); color: #000; margin-bottom: 10px; }
         .btn-exit { background: rgba(255,68,68,0.2); color:#ff4444; border:1px solid #ff4444; font-size: 12px; }
-        .history { position: fixed; right: 10px; top: 70px; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
-        .h-item { background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 5px; font-size: 10px; animation: slideIn 0.3s ease; }
-        @keyframes slideIn { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -29,10 +24,7 @@
 <canvas id="plinkoCanvas"></canvas>
 
 <div id="ui">
-    <div id="header">
-        <div class="badge">⭐ <span id="bal-display">0</span></div>
-    </div>
-    <div class="history" id="history"></div>
+    <div class="badge">⭐ <span id="bal-display">0</span></div>
     <div id="controls">
         <div class="input-group">
             <input type="number" id="bet-input" value="10" min="10" step="10">
@@ -63,22 +55,23 @@
     const rows = 14; 
     const pins = [];
     const balls = [];
+    
+    // НОВАЯ ЛОГИКА: Центр — высокий коэф, края — низкий
     const buckets = [
-        {m: 15, c: "#ff0000"}, {m: 5, c: "#ff4500"}, {m: 1.5, c: "#ffa500"}, 
-        {m: 0.5, c: "#ffff00"}, {m: 0.2, c: "#9acd32"}, {m: 0.2, c: "#00ff00"}, 
-        {m: 0.1, c: "#00ff00"}, {m: 0.2, c: "#00ff00"}, {m: 0.2, c: "#9acd32"}, 
-        {m: 0.5, c: "#ffff00"}, {m: 1.5, c: "#ffa500"}, {m: 5, c: "#ff4500"}, {m: 15, c: "#ff0000"}
+        {m: 0.1, c: "#ff0000"}, {m: 0.2, c: "#ff4500"}, {m: 0.5, c: "#ffa500"}, 
+        {m: 1.5, c: "#ffff00"}, {m: 5, c: "#00ff00"}, {m: 10, c: "#00f2ff"}, 
+        {m: 20, c: "#ffffff"}, // САМЫЙ ЦЕНТР
+        {m: 10, c: "#00f2ff"}, {m: 5, c: "#00ff00"}, {m: 1.5, c: "#ffff00"}, 
+        {m: 0.5, c: "#ffa500"}, {m: 0.2, c: "#ff4500"}, {m: 0.1, c: "#ff0000"}
     ];
 
-    // Звуковой движок
+    // Звуковой движок (упрощенный)
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playNote(freq, dur, vol=0.05) {
+    function playNote(freq, dur) {
         try {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'sine';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + dur);
@@ -90,27 +83,16 @@
     for (let i = 2; i <= rows + 1; i++) {
         const rowY = startY + (i - 2) * (spacing * 0.85);
         for (let j = 0; j < i; j++) {
-            pins.push({
-                x: canvas.width / 2 - (i - 1) * spacing / 2 + j * spacing,
-                y: rowY,
-                active: 0
-            });
+            pins.push({ x: canvas.width / 2 - (i - 1) * spacing / 2 + j * spacing, y: rowY, active: 0 });
         }
     }
 
     function dropBall() {
         const bet = parseInt(document.getElementById('bet-input').value);
         if (bet > balance || bet < 1) return;
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        
         balance -= bet;
         document.getElementById('bal-display').innerText = balance;
-        playNote(400, 0.1);
-
-        balls.push({
-            x: canvas.width / 2 + (Math.random() - 0.5) * 15,
-            y: 50, vx: (Math.random() - 0.5) * 2, vy: 0, radius: 5, bet: bet
-        });
+        balls.push({ x: canvas.width / 2 + (Math.random() - 0.5) * 5, y: 50, vx: (Math.random() - 0.5) * 1, vy: 0, radius: 5, bet: bet });
     }
 
     function update() {
@@ -120,7 +102,7 @@
         pins.forEach(p => {
             ctx.fillStyle = p.active > 0 ? "#00f2ff" : "#3a4452";
             if(p.active > 0) p.active--;
-            ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, 7); ctx.fill();
         });
 
         const bW = canvas.width / buckets.length;
@@ -128,11 +110,9 @@
         
         buckets.forEach((b, i) => {
             ctx.fillStyle = b.c;
-            ctx.globalAlpha = 0.1;
+            ctx.globalAlpha = 0.2;
             ctx.fillRect(i * bW + 2, bY, bW - 4, 45);
             ctx.globalAlpha = 1;
-            ctx.strokeStyle = b.c;
-            ctx.strokeRect(i * bW + 2, bY, bW - 4, 45);
             ctx.font = "bold 10px Orbitron";
             ctx.textAlign = "center";
             ctx.fillText(b.m + "x", i * bW + bW/2, bY + 28);
@@ -140,28 +120,23 @@
 
         for (let i = balls.length - 1; i >= 0; i--) {
             let b = balls[i];
-            b.vy += 0.35; 
-            b.x += b.vx; b.y += b.vy;
+            b.vy += 0.35; b.x += b.vx; b.y += b.vy;
 
-            // МАГНИТ УДАЛЕН. Только столкновения.
             pins.forEach(p => {
                 const dx = b.x - p.x; const dy = b.y - p.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < b.radius + 3) {
-                    p.active = 15;
+                if (dist < 8) {
+                    p.active = 10;
                     const angle = Math.atan2(dy, dx);
-                    const force = 0.7;
-                    b.vx += Math.cos(angle) * force + (Math.random() - 0.5) * 0.3;
-                    b.vy = Math.abs(b.vy) * 0.45;
-                    b.y = p.y + Math.sin(angle) * (b.radius + 3.1);
-                    playNote(200 + Math.random() * 400, 0.05, 0.02);
+                    b.vx += Math.cos(angle) * 0.6;
+                    b.vy *= 0.5;
+                    b.y = p.y + 8;
+                    playNote(300 + Math.random() * 200, 0.1);
                 }
             });
 
             ctx.fillStyle = "#00f2ff";
-            ctx.shadowBlur = 10; ctx.shadowColor = "#00f2ff";
-            ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
+            ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, 7); ctx.fill();
 
             if (b.y > bY) {
                 let idx = Math.floor(b.x / bW);
@@ -170,22 +145,10 @@
                 const win = Math.floor(b.bet * buckets[idx].m);
                 balance += win;
                 document.getElementById('bal-display').innerText = balance;
-                addHistory(buckets[idx].m);
-                playNote(win >= b.bet ? 800 : 150, 0.2);
                 balls.splice(i, 1);
             }
         }
         requestAnimationFrame(update);
-    }
-
-    function addHistory(m) {
-        const h = document.getElementById('history');
-        const item = document.createElement('div');
-        item.className = 'h-item';
-        item.innerText = m + 'x';
-        item.style.color = m >= 1 ? '#00ff00' : '#ff4444';
-        h.prepend(item);
-        if(h.children.length > 5) h.lastChild.remove();
     }
 
     function finalizeAndExit() {
