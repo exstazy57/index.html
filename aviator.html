@@ -3,47 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DAG AVIATOR REALISTIC</title>
+    <title>DAG AVIATOR 3D</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; color: white; touch-action: none; }
-        canvas { display: block; filter: contrast(1.1) brightness(1.1); }
+        body { margin: 0; padding: 0; overflow: hidden; background: #050508; font-family: 'Orbitron', sans-serif; color: white; touch-action: none; }
+        canvas { display: block; }
         
-        #ui { position: absolute; top: 8%; left: 0; width: 100%; pointer-events: none; text-align: center; z-index: 10; }
-        #multiplier { font-size: 85px; font-weight: 900; color: #00f2ff; text-shadow: 0 0 20px #00f2ff, 0 0 40px #0066ff; font-family: monospace; }
-        #status { font-size: 18px; color: #aaa; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 10px; }
+        /* Фикс выхода окон за пределы */
+        #ui-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; box-sizing: border-box; }
+        
+        #header { display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
+        .stat-badge { background: rgba(0,0,0,0.6); border: 1px solid #00f2ff; padding: 8px 15px; border-radius: 12px; font-size: 14px; box-shadow: 0 0 10px rgba(0,242,255,0.2); }
+        
+        #multiplier-container { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #multiplier { font-size: clamp(40px, 15vw, 80px); font-weight: 900; color: #00f2ff; text-shadow: 0 0 30px #00f2ff; margin: 0; transition: transform 0.1s; }
+        #status { font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 2px; }
 
-        #controls { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, #0a0c10, #151921); padding: 30px 20px; border-top: 2px solid #2a2f3a; z-index: 20; box-shadow: 0 -10px 30px rgba(0,0,0,0.8); }
-        .bet-box { max-width: 450px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
+        #controls { background: rgba(15, 20, 28, 0.95); padding: 20px; border-radius: 25px 25px 0 0; border-top: 2px solid #2a2f3a; pointer-events: auto; box-shadow: 0 -10px 40px rgba(0,0,0,0.9); }
+        .bet-box { max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
         
-        input { background: #000; border: 1px solid #3a4150; color: #fff; padding: 18px; border-radius: 12px; font-size: 22px; text-align: center; outline: none; box-shadow: inset 0 0 10px rgba(0,242,255,0.1); }
+        input { background: #000; border: 1px solid #3a4150; color: #fff; padding: 15px; border-radius: 12px; font-size: 20px; text-align: center; outline: none; font-family: 'Orbitron'; }
         
-        button { padding: 22px; border-radius: 12px; font-size: 20px; font-weight: 900; border: none; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
-        #btn-bet { background: linear-gradient(180deg, #00ff88, #00a859); color: #002b17; box-shadow: 0 0 20px rgba(0,255,136,0.4); }
-        #btn-cash { background: linear-gradient(180deg, #ffcc00, #d4ac00); color: #2b2100; display: none; box-shadow: 0 0 20px rgba(255,204,0,0.4); }
-        button:active { transform: scale(0.96); box-shadow: none; }
+        button { padding: 18px; border-radius: 12px; font-size: 18px; font-weight: 900; border: none; cursor: pointer; text-transform: uppercase; font-family: 'Orbitron'; transition: 0.2s; }
+        #btn-bet { background: linear-gradient(180deg, #00ff88, #00a859); color: #002b17; }
+        #btn-cash { background: linear-gradient(180deg, #ffcc00, #d4ac00); color: #2b2100; display: none; }
+        button:active { transform: scale(0.95); }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="ui">
-        <div id="status">Waiting for bet</div>
-        <div id="multiplier">1.00x</div>
-    </div>
+    <canvas id="gameCanvas"></canvas>
 
-    <div id="controls">
-        <div class="bet-box">
-            <input type="number" id="bet-input" value="10" min="1">
-            <button id="btn-bet" onclick="startRound()">Place Bet</button>
-            <button id="btn-cash" onclick="cashOut()">Cashout</button>
+    <div id="ui-layer">
+        <div id="header">
+            <div class="stat-badge">⭐ <span id="user-balance">0</span></div>
+            <div class="stat-badge" style="border-color: #ff3e3e;">LIVE</div>
+        </div>
+
+        <div id="multiplier-container">
+            <div id="status">READY FOR TAKE OFF</div>
+            <div id="multiplier">1.00x</div>
+        </div>
+
+        <div id="controls">
+            <div class="bet-box">
+                <input type="number" id="bet-input" value="10" min="10">
+                <button id="btn-bet" onclick="startRound()">PLACE BET</button>
+                <button id="btn-cash" onclick="cashOut()">CASHOUT</button>
+            </div>
         </div>
     </div>
-
-    <canvas id="gameCanvas"></canvas>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let balance = parseInt(urlParams.get('bal')) || 0;
+        document.getElementById('user-balance').innerText = balance;
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const multDisplay = document.getElementById('multiplier');
@@ -53,146 +74,169 @@
         canvas.height = window.innerHeight;
 
         let isFlying = false, multiplier = 1.0, bet = 0, crashPoint = 0, startTime = 0;
-        let points = [], stars = [], particles = [];
+        let stars = [], particles = [], trail = [];
+        let cameraY = 0;
 
-        // Инициализация космоса
-        for(let i=0; i<150; i++) stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, z: Math.random()*2, o: Math.random()});
+        // Звуковой движок
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let engineOsc = null;
 
-        function drawRocket(x, y, angle) {
+        function playSound(freq, type, dur, vol = 0.1) {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = type; osc.frequency.value = freq;
+            g.gain.setValueAtTime(vol, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + dur);
+        }
+
+        function startEngineSound() {
+            engineOsc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            engineOsc.type = 'sawtooth';
+            engineOsc.frequency.value = 40;
+            g.gain.value = 0.05;
+            engineOsc.connect(g); g.connect(audioCtx.destination);
+            engineOsc.start();
+            return { osc: engineOsc, gain: g };
+        }
+
+        // Инициализация звезд (3D эффект)
+        for(let i=0; i<200; i++) {
+            stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, s: Math.random() * 3, opacity: Math.random() });
+        }
+
+        function drawRocket(x, y, scale) {
             ctx.save();
             ctx.translate(x, y);
-            ctx.rotate(angle);
+            ctx.scale(scale, scale);
+            ctx.rotate(-Math.PI / 12); // Небольшой наклон вверх
 
-            // 1. Реалистичное пламя (многослойное)
-            const time = Date.now() * 0.01;
-            for(let i=0; i<3; i++) {
-                const size = 20 + Math.sin(time + i) * 10;
-                const grad = ctx.createRadialGradient(-20, 0, 0, -30, 0, size * 2);
-                grad.addColorStop(0, '#fff');
-                grad.addColorStop(0.3, '#ffcc00');
-                grad.addColorStop(0.6, '#ff4400');
-                grad.addColorStop(1, 'transparent');
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                ctx.ellipse(-25, 0, size * 2.5, size / 1.5, 0, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            // Огонь
+            const flameSize = 20 + Math.random() * 15;
+            const grad = ctx.createRadialGradient(-20, 0, 0, -30, 0, flameSize * 2);
+            grad.addColorStop(0, '#fff'); grad.addColorStop(0.4, '#ffcc00'); grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.ellipse(-25, 0, flameSize * 2, flameSize / 2, 0, 0, Math.PI * 2); ctx.fill();
 
-            // 2. Корпус (Металлический градиент)
-            const bodyGrad = ctx.createLinearGradient(0, -15, 0, 15);
-            bodyGrad.addColorStop(0, '#7f8c8d');
-            bodyGrad.addColorStop(0.5, '#bdc3c7');
-            bodyGrad.addColorStop(1, '#2c3e50');
+            // Корпус
+            ctx.fillStyle = '#bdc3c7';
+            ctx.beginPath(); ctx.moveTo(40, 0); ctx.bezierCurveTo(40, -20, -30, -20, -30, -10);
+            ctx.lineTo(-30, 10); ctx.bezierCurveTo(-30, 20, 40, 20, 40, 0); ctx.fill();
             
-            ctx.fillStyle = bodyGrad;
-            ctx.beginPath();
-            ctx.moveTo(35, 0);
-            ctx.bezierCurveTo(35, -18, -25, -18, -25, -12);
-            ctx.lineTo(-25, 12);
-            ctx.bezierCurveTo(-25, 18, 35, 18, 35, 0);
-            ctx.fill();
-
-            // 3. Иллюминатор с бликом
-            ctx.fillStyle = '#1a1a1a';
-            ctx.beginPath(); ctx.arc(8, 0, 7, 0, Math.PI*2); ctx.fill();
+            // Стекло
             ctx.fillStyle = '#00f2ff';
-            ctx.beginPath(); ctx.arc(8, 0, 5, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = 'white';
-            ctx.beginPath(); ctx.arc(10, -2, 2, 0, Math.PI*2); ctx.fill();
-
+            ctx.beginPath(); ctx.arc(10, 0, 6, 0, Math.PI*2); ctx.fill();
+            
             ctx.restore();
         }
 
-        function draw() {
-            // Фон: глубокий космос
-            const bgGrad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
-            bgGrad.addColorStop(0, '#0a121d');
-            bgGrad.addColorStop(1, '#000000');
-            ctx.fillStyle = bgGrad;
+        function update() {
+            ctx.fillStyle = '#050508';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Звезды
-            ctx.fillStyle = "white";
+            // Отрисовка звезд с параллаксом
             stars.forEach(s => {
-                ctx.globalAlpha = s.o;
-                ctx.beginPath(); ctx.arc(s.x, s.y, s.z, 0, Math.PI*2); ctx.fill();
-                if(isFlying) {
-                    s.x -= s.z * 5;
-                    if(s.x < 0) s.x = canvas.width;
-                }
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.opacity})`;
+                let speed = isFlying ? s.s * 10 : s.s;
+                s.x -= speed;
+                if (s.x < 0) s.x = canvas.width;
+                ctx.fillRect(s.x, s.y, s.s, s.s);
             });
-            ctx.globalAlpha = 1.0;
 
-            if(isFlying) {
+            if (isFlying) {
                 let elapsed = (Date.now() - startTime) / 1000;
-                multiplier = Math.pow(1.10, elapsed * 2);
+                multiplier = Math.pow(1.08, elapsed * 2.5);
                 
-                if(multiplier >= crashPoint) return gameOver();
+                if (multiplier >= crashPoint) return gameOver();
 
                 multDisplay.innerText = multiplier.toFixed(2) + "x";
-
-                // Траектория (как на фото)
-                let plotX = 60 + (elapsed * 50);
-                let plotY = (canvas.height - 280) - (Math.pow(elapsed, 1.4) * 30);
-                let offsetX = plotX > canvas.width * 0.5 ? plotX - canvas.width * 0.5 : 0;
+                multDisplay.style.transform = `scale(${1 + (multiplier * 0.01)})`;
                 
-                points.push({x: plotX, y: plotY});
+                // Камера плавно дрожит при росте
+                cameraY = Math.sin(Date.now() * 0.1) * 2;
 
-                ctx.save();
-                ctx.translate(-offsetX, 0);
+                // Отрисовка шлейфа
+                trail.push({x: canvas.width * 0.3, y: canvas.height * 0.6 + cameraY});
+                if(trail.length > 30) trail.shift();
                 
-                // Свечение дуги
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = '#00f2ff';
-                ctx.strokeStyle = '#00f2ff';
-                ctx.lineWidth = 4;
+                ctx.strokeStyle = "rgba(0, 242, 255, 0.3)";
+                ctx.lineWidth = 5;
                 ctx.beginPath();
-                ctx.moveTo(points[0].x, points[0].y);
-                points.forEach(p => ctx.lineTo(p.x, p.y));
+                trail.forEach((p, i) => {
+                    p.x -= 8; // Сдвиг шлейфа назад
+                    ctx.lineTo(p.x, p.y);
+                });
                 ctx.stroke();
-                ctx.restore();
-                ctx.shadowBlur = 0;
 
-                drawRocket(plotX - offsetX, plotY, -0.2);
+                drawRocket(canvas.width * 0.3, canvas.height * 0.6 + cameraY, 1.2);
+                
+                if (engineOsc) engineOsc.frequency.value = 40 + (multiplier * 10);
+            } else {
+                // В ожидании
+                drawRocket(canvas.width * 0.2, canvas.height * 0.7, 1.0);
             }
-            requestAnimationFrame(draw);
+
+            requestAnimationFrame(update);
         }
 
         function startRound() {
             bet = parseInt(document.getElementById('bet-input').value);
-            if(isNaN(bet) || bet <= 0) return;
-            
-            crashPoint = (Math.random() < 0.08) ? 1.01 : (1 + Math.random() * 2 + Math.pow(Math.random(), 2) * 20).toFixed(2);
-            isFlying = true; multiplier = 1.0; startTime = Date.now();
-            points = [{x: 60, y: canvas.height - 280}];
-            
-            document.getElementById('btn-bet').style.display = 'none';
+            if (bet > balance) return tg.showAlert("NOT ENOUGH STARS!");
+            if (bet < 10) return;
+
+            balance -= bet;
+            document.getElementById('user-balance').innerText = balance;
+
+            crashPoint = (1 + Math.random() * 3 + Math.pow(Math.random(), 3) * 15).toFixed(2);
+            if (Math.random() < 0.05) crashPoint = 1.00; // Моментальный краш
+
+            isFlying = true; startTime = Date.now(); trail = [];
+            document.getElementById('btn-bet').classList.add('hidden');
             document.getElementById('btn-cash').style.display = 'block';
-            statusDisplay.innerText = "Rocket in flight";
-            multDisplay.style.color = "#00f2ff";
+            statusDisplay.innerText = "ROCKET IN FLIGHT";
+            
+            startEngineSound();
+            playSound(200, 'square', 0.2);
+            tg.HapticFeedback.impactOccurred('medium');
         }
 
         function cashOut() {
-            if(!isFlying) return;
-            isFlying = false;
+            if (!isFlying) return;
             let win = Math.floor(bet * multiplier);
+            balance += win;
+            isFlying = false;
+            
+            if (engineOsc) { engineOsc.stop(); engineOsc = null; }
+            
+            playSound(600, 'sine', 0.5, 0.2);
             tg.HapticFeedback.notificationOccurred('success');
-            tg.sendData(JSON.stringify({action: "win", amount: win, bet: bet, game: "aviator"}));
-            statusDisplay.innerText = "Cashed out!";
-            setTimeout(() => location.reload(), 1500);
+            
+            tg.showAlert(`WIN: ${win} ⭐`);
+            syncAndExit();
         }
 
         function gameOver() {
             isFlying = false;
-            multDisplay.innerText = "CRASHED";
-            multDisplay.style.color = '#ff3e3e';
-            statusDisplay.innerText = "Rocket lost";
+            if (engineOsc) { engineOsc.stop(); engineOsc = null; }
+            
+            playSound(100, 'sawtooth', 0.4, 0.3);
             tg.HapticFeedback.notificationOccurred('error');
-            tg.sendData(JSON.stringify({action: "loss", bet: bet, game: "aviator"}));
-            setTimeout(() => location.reload(), 2500);
+            
+            multDisplay.style.color = "#ff3e3e";
+            multDisplay.innerText = "CRASHED";
+            
+            setTimeout(() => {
+                syncAndExit();
+            }, 2000);
         }
 
-        draw();
+        function syncAndExit() {
+            tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
+        }
+
+        update();
     </script>
 </body>
 </html>
