@@ -3,33 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DAG AVIATOR 3D</title>
+    <title>DAG AVIATOR PRO</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background: #050508; font-family: 'Orbitron', sans-serif; color: white; touch-action: none; }
         canvas { display: block; }
         
-        /* Фикс выхода окон за пределы */
         #ui-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; box-sizing: border-box; }
         
         #header { display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
-        .stat-badge { background: rgba(0,0,0,0.6); border: 1px solid #00f2ff; padding: 8px 15px; border-radius: 12px; font-size: 14px; box-shadow: 0 0 10px rgba(0,242,255,0.2); }
+        .stat-badge { background: rgba(20, 25, 35, 0.8); border: 1px solid #00f2ff; padding: 10px 18px; border-radius: 15px; font-size: 16px; font-weight: 900; color: #00f2ff; box-shadow: 0 0 15px rgba(0,242,255,0.2); }
         
         #multiplier-container { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #multiplier { font-size: clamp(40px, 15vw, 80px); font-weight: 900; color: #00f2ff; text-shadow: 0 0 30px #00f2ff; margin: 0; transition: transform 0.1s; }
-        #status { font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 2px; }
+        #multiplier { font-size: clamp(50px, 18vw, 90px); font-weight: 900; color: #fff; text-shadow: 0 0 30px rgba(0,242,255,0.8); margin: 0; }
+        #status { font-size: 14px; color: #00f2ff; text-transform: uppercase; letter-spacing: 4px; opacity: 0.8; }
 
-        #controls { background: rgba(15, 20, 28, 0.95); padding: 20px; border-radius: 25px 25px 0 0; border-top: 2px solid #2a2f3a; pointer-events: auto; box-shadow: 0 -10px 40px rgba(0,0,0,0.9); }
-        .bet-box { max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+        #controls { background: linear-gradient(0deg, #0a0c10 0%, rgba(15,25,35,0.9) 100%); padding: 25px; border-radius: 30px 30px 0 0; border-top: 2px solid #00f2ff; pointer-events: auto; }
+        .bet-box { max-width: 400px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
         
-        input { background: #000; border: 1px solid #3a4150; color: #fff; padding: 15px; border-radius: 12px; font-size: 20px; text-align: center; outline: none; font-family: 'Orbitron'; }
+        input { background: #000; border: 2px solid #1a1f2b; color: #fff; padding: 18px; border-radius: 15px; font-size: 22px; text-align: center; outline: none; font-family: 'Orbitron'; transition: 0.3s; }
+        input:focus { border-color: #00f2ff; box-shadow: 0 0 10px rgba(0,242,255,0.3); }
         
-        button { padding: 18px; border-radius: 12px; font-size: 18px; font-weight: 900; border: none; cursor: pointer; text-transform: uppercase; font-family: 'Orbitron'; transition: 0.2s; }
-        #btn-bet { background: linear-gradient(180deg, #00ff88, #00a859); color: #002b17; }
-        #btn-cash { background: linear-gradient(180deg, #ffcc00, #d4ac00); color: #2b2100; display: none; }
-        button:active { transform: scale(0.95); }
+        button { padding: 20px; border-radius: 15px; font-size: 20px; font-weight: 900; border: none; cursor: pointer; text-transform: uppercase; font-family: 'Orbitron'; transition: 0.2s; position: relative; overflow: hidden; }
+        #btn-bet { background: linear-gradient(180deg, #00ff88, #00a859); color: #002b17; box-shadow: 0 5px 15px rgba(0,255,136,0.3); }
+        #btn-cash { background: linear-gradient(180deg, #ffcc00, #d4ac00); color: #2b2100; display: none; box-shadow: 0 5px 15px rgba(255,204,0,0.3); }
+        button:active { transform: translateY(2px); }
 
+        /* Окно результата */
+        #result-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; pointer-events: auto; backdrop-filter: blur(5px); }
+        #result-card { background: #151921; border: 2px solid #00f2ff; padding: 40px; border-radius: 30px; text-align: center; box-shadow: 0 0 50px rgba(0,242,255,0.2); }
+        #result-val { font-size: 48px; font-weight: 900; margin: 10px 0; }
+        .btn-again { background: #00f2ff; color: #000; margin-top: 20px; padding: 15px 40px; }
+        
         .hidden { display: none !important; }
     </style>
 </head>
@@ -37,14 +43,22 @@
 
     <canvas id="gameCanvas"></canvas>
 
+    <div id="result-overlay">
+        <div id="result-card">
+            <div id="result-title" style="color: #aaa;">РЕЗУЛЬТАТ</div>
+            <div id="result-val">x1.50</div>
+            <button class="btn-again" onclick="resetGame()">ИГРАТЬ ЕЩЕ</button>
+        </div>
+    </div>
+
     <div id="ui-layer">
         <div id="header">
             <div class="stat-badge">⭐ <span id="user-balance">0</span></div>
-            <div class="stat-badge" style="border-color: #ff3e3e;">LIVE</div>
+            <div class="stat-badge" style="border-color: #ff3e3e; color: #ff3e3e;">LIVE</div>
         </div>
 
         <div id="multiplier-container">
-            <div id="status">READY FOR TAKE OFF</div>
+            <div id="status">WAITING FOR BET</div>
             <div id="multiplier">1.00x</div>
         </div>
 
@@ -74,108 +88,87 @@
         canvas.height = window.innerHeight;
 
         let isFlying = false, multiplier = 1.0, bet = 0, crashPoint = 0, startTime = 0;
-        let stars = [], particles = [], trail = [];
-        let cameraY = 0;
+        let stars = [], trail = [];
 
-        // Звуковой движок
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let engineOsc = null;
-
-        function playSound(freq, type, dur, vol = 0.1) {
-            const osc = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            osc.type = type; osc.frequency.value = freq;
-            g.gain.setValueAtTime(vol, audioCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-            osc.connect(g); g.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + dur);
-        }
-
-        function startEngineSound() {
-            engineOsc = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            engineOsc.type = 'sawtooth';
-            engineOsc.frequency.value = 40;
-            g.gain.value = 0.05;
-            engineOsc.connect(g); g.connect(audioCtx.destination);
-            engineOsc.start();
-            return { osc: engineOsc, gain: g };
-        }
-
-        // Инициализация звезд (3D эффект)
-        for(let i=0; i<200; i++) {
-            stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, s: Math.random() * 3, opacity: Math.random() });
+        // Инициализация звезд
+        for(let i=0; i<150; i++) {
+            stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, s: Math.random() * 2 + 1 });
         }
 
         function drawRocket(x, y, scale) {
             ctx.save();
             ctx.translate(x, y);
             ctx.scale(scale, scale);
-            ctx.rotate(-Math.PI / 12); // Небольшой наклон вверх
+            ctx.rotate(-0.15);
 
-            // Огонь
-            const flameSize = 20 + Math.random() * 15;
-            const grad = ctx.createRadialGradient(-20, 0, 0, -30, 0, flameSize * 2);
-            grad.addColorStop(0, '#fff'); grad.addColorStop(0.4, '#ffcc00'); grad.addColorStop(1, 'transparent');
-            ctx.fillStyle = grad;
-            ctx.beginPath(); ctx.ellipse(-25, 0, flameSize * 2, flameSize / 2, 0, 0, Math.PI * 2); ctx.fill();
+            // Анимированное пламя
+            const fSize = 15 + Math.random() * 10;
+            const glow = ctx.createRadialGradient(-25, 0, 0, -35, 0, fSize * 2);
+            glow.addColorStop(0, '#fff'); glow.addColorStop(0.3, '#00f2ff'); glow.addColorStop(1, 'transparent');
+            ctx.fillStyle = glow;
+            ctx.beginPath(); ctx.ellipse(-30, 0, fSize * 3, fSize, 0, 0, Math.PI*2); ctx.fill();
 
-            // Корпус
-            ctx.fillStyle = '#bdc3c7';
-            ctx.beginPath(); ctx.moveTo(40, 0); ctx.bezierCurveTo(40, -20, -30, -20, -30, -10);
-            ctx.lineTo(-30, 10); ctx.bezierCurveTo(-30, 20, 40, 20, 40, 0); ctx.fill();
-            
-            // Стекло
+            // КОРПУС РАКЕТЫ (УЛУЧШЕННЫЙ)
+            // Крылья (стабилизаторы)
+            ctx.fillStyle = '#555';
+            ctx.beginPath(); ctx.moveTo(-15, -15); ctx.lineTo(-25, -25); ctx.lineTo(-25, 25); ctx.lineTo(-15, 15); ctx.fill();
+
+            // Основное тело
+            const bodyGrad = ctx.createLinearGradient(0, -15, 0, 15);
+            bodyGrad.addColorStop(0, '#bdc3c7'); bodyGrad.addColorStop(0.5, '#fff'); bodyGrad.addColorStop(1, '#7f8c8d');
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.moveTo(45, 0); 
+            ctx.bezierCurveTo(45, -18, -20, -18, -25, -12);
+            ctx.lineTo(-25, 12);
+            ctx.bezierCurveTo(-20, 18, 45, 18, 45, 0);
+            ctx.fill();
+
+            // Нос
+            ctx.fillStyle = '#ff3e3e';
+            ctx.beginPath(); ctx.moveTo(45, 0); ctx.bezierCurveTo(45, -10, 30, -10, 30, 0); ctx.bezierCurveTo(30, 10, 45, 10, 45, 0); ctx.fill();
+
+            // Иллюминатор
+            ctx.fillStyle = '#1a1f2b';
+            ctx.beginPath(); ctx.arc(12, 0, 7, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#00f2ff';
-            ctx.beginPath(); ctx.arc(10, 0, 6, 0, Math.PI*2); ctx.fill();
-            
+            ctx.beginPath(); ctx.arc(12, 0, 5, 0, Math.PI*2); ctx.fill();
+
             ctx.restore();
         }
 
         function update() {
-            ctx.fillStyle = '#050508';
+            ctx.fillStyle = '#05070a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Отрисовка звезд с параллаксом
             stars.forEach(s => {
-                ctx.fillStyle = `rgba(255, 255, 255, ${s.opacity})`;
-                let speed = isFlying ? s.s * 10 : s.s;
-                s.x -= speed;
-                if (s.x < 0) s.x = canvas.width;
+                ctx.fillStyle = "#fff";
+                s.x -= isFlying ? s.s * 12 : s.s * 0.5;
+                if(s.x < 0) s.x = canvas.width;
                 ctx.fillRect(s.x, s.y, s.s, s.s);
             });
 
             if (isFlying) {
                 let elapsed = (Date.now() - startTime) / 1000;
-                multiplier = Math.pow(1.08, elapsed * 2.5);
+                multiplier = Math.pow(1.07, elapsed * 3);
                 
                 if (multiplier >= crashPoint) return gameOver();
 
                 multDisplay.innerText = multiplier.toFixed(2) + "x";
-                multDisplay.style.transform = `scale(${1 + (multiplier * 0.01)})`;
                 
-                // Камера плавно дрожит при росте
-                cameraY = Math.sin(Date.now() * 0.1) * 2;
-
-                // Отрисовка шлейфа
-                trail.push({x: canvas.width * 0.3, y: canvas.height * 0.6 + cameraY});
-                if(trail.length > 30) trail.shift();
+                // Эффект тряски
+                let shake = Math.random() * 3;
+                drawRocket(canvas.width * 0.3, canvas.height * 0.55 + shake, 1.2);
                 
-                ctx.strokeStyle = "rgba(0, 242, 255, 0.3)";
-                ctx.lineWidth = 5;
-                ctx.beginPath();
-                trail.forEach((p, i) => {
-                    p.x -= 8; // Сдвиг шлейфа назад
-                    ctx.lineTo(p.x, p.y);
-                });
+                // Линия пути
+                trail.push({x: canvas.width * 0.3, y: canvas.height * 0.55 + shake});
+                if(trail.length > 40) trail.shift();
+                ctx.strokeStyle = "rgba(0, 242, 255, 0.4)";
+                ctx.lineWidth = 4; ctx.beginPath();
+                trail.forEach((p, i) => { p.x -= 10; ctx.lineTo(p.x, p.y); });
                 ctx.stroke();
-
-                drawRocket(canvas.width * 0.3, canvas.height * 0.6 + cameraY, 1.2);
-                
-                if (engineOsc) engineOsc.frequency.value = 40 + (multiplier * 10);
             } else {
-                // В ожидании
-                drawRocket(canvas.width * 0.2, canvas.height * 0.7, 1.0);
+                drawRocket(canvas.width * 0.25, canvas.height * 0.6, 1.1);
             }
 
             requestAnimationFrame(update);
@@ -183,22 +176,17 @@
 
         function startRound() {
             bet = parseInt(document.getElementById('bet-input').value);
-            if (bet > balance) return tg.showAlert("NOT ENOUGH STARS!");
-            if (bet < 10) return;
-
+            if (bet > balance) return tg.showAlert("МАЛО ЗВЕЗД!");
+            
             balance -= bet;
-            document.getElementById('user-balance').innerText = balance;
+            updateUI();
 
-            crashPoint = (1 + Math.random() * 3 + Math.pow(Math.random(), 3) * 15).toFixed(2);
-            if (Math.random() < 0.05) crashPoint = 1.00; // Моментальный краш
-
+            crashPoint = (1.05 + Math.random() * 2 + Math.pow(Math.random(), 4) * 30).toFixed(2);
             isFlying = true; startTime = Date.now(); trail = [];
+            
             document.getElementById('btn-bet').classList.add('hidden');
             document.getElementById('btn-cash').style.display = 'block';
-            statusDisplay.innerText = "ROCKET IN FLIGHT";
-            
-            startEngineSound();
-            playSound(200, 'square', 0.2);
+            statusDisplay.innerText = "В ПОЛЕТЕ...";
             tg.HapticFeedback.impactOccurred('medium');
         }
 
@@ -206,33 +194,47 @@
             if (!isFlying) return;
             let win = Math.floor(bet * multiplier);
             balance += win;
+            showResult(true, multiplier.toFixed(2), win);
             isFlying = false;
-            
-            if (engineOsc) { engineOsc.stop(); engineOsc = null; }
-            
-            playSound(600, 'sine', 0.5, 0.2);
             tg.HapticFeedback.notificationOccurred('success');
-            
-            tg.showAlert(`WIN: ${win} ⭐`);
-            syncAndExit();
+            syncBalance();
         }
 
         function gameOver() {
             isFlying = false;
-            if (engineOsc) { engineOsc.stop(); engineOsc = null; }
-            
-            playSound(100, 'sawtooth', 0.4, 0.3);
+            showResult(false, multiplier.toFixed(2), 0);
             tg.HapticFeedback.notificationOccurred('error');
-            
-            multDisplay.style.color = "#ff3e3e";
-            multDisplay.innerText = "CRASHED";
-            
-            setTimeout(() => {
-                syncAndExit();
-            }, 2000);
+            syncBalance();
         }
 
-        function syncAndExit() {
+        function showResult(isWin, mult, winAmt) {
+            const overlay = document.getElementById('result-overlay');
+            const val = document.getElementById('result-val');
+            overlay.style.display = 'flex';
+            if(isWin) {
+                val.innerText = `+${winAmt} ⭐`;
+                val.style.color = "#00ff88";
+            } else {
+                val.innerText = `CRASH x${mult}`;
+                val.style.color = "#ff3e3e";
+            }
+        }
+
+        function resetGame() {
+            document.getElementById('result-overlay').style.display = 'none';
+            document.getElementById('btn-bet').classList.remove('hidden');
+            document.getElementById('btn-cash').style.display = 'none';
+            multDisplay.innerText = "1.00x";
+            statusDisplay.innerText = "WAITING FOR BET";
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('user-balance').innerText = balance;
+        }
+
+        function syncBalance() {
+            // Отправляем данные боту в фоновом режиме
             tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
         }
 
