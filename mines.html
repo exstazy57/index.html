@@ -1,200 +1,190 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DAG Mines - Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mines Stars</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 0; overflow: hidden; }
-        .header { background: #222; padding: 10px 20px; border-bottom: 2px solid #f7941d; display: flex; justify-content: space-between; align-items: center; }
-        .balance-box { color: #f7941d; font-weight: bold; font-size: 18px; text-shadow: 0 0 10px rgba(247, 148, 29, 0.3); }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 320px; margin: 20px auto; display: none; }
-        .cell { width: 55px; height: 55px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; border: 2px solid #444; transition: 0.2s; }
-        .cell.open.gem { background: #2ecc71; border-color: #27ae60; box-shadow: 0 0 10px #2ecc71; }
-        .cell.open.bomb { background: #e74c3c; border-color: #c0392b; animation: shake 0.2s; }
-        @keyframes shake { 0% {transform:translateX(0)} 25% {transform:translateX(5px)} 50% {transform:translateX(-5px)} 100% {transform:translateX(0)} }
-        .menu { background: #222; padding: 20px; border-radius: 15px; border: 1px solid #444; margin: 15px; }
-        select, input { width: 90%; padding: 12px; margin: 10px 0; background: #333; border: 1px solid #555; color: white; border-radius: 8px; font-size: 16px; text-align: center; outline: none; }
-        button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
-        .btn-start { background: #f7941d; color: white; }
-        .btn-cashout { background: #2ecc71; color: white; display: none; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4); }
-        .btn-exit { background: #444; color: #ccc; font-size: 12px; padding: 10px 30px; width: auto; display: inline-block; margin-top: 10px; }
-        #info { margin-bottom: 15px; font-size: 18px; color: #f7941d; font-weight: bold; }
-        .label { font-size: 12px; color: #aaa; margin-top: 5px; display: block; text-transform: uppercase; }
+        body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; margin: 0; overflow: hidden; }
+        #balance-card { background: #1e293b; padding: 15px; border-bottom: 2px solid #3b82f6; }
+        #balance-val { font-size: 24px; font-weight: bold; color: #fbbf24; transition: all 0.3s; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 20px; max-width: 350px; margin: 0 auto; }
+        .cell { aspect-ratio: 1; background: #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; border: none; }
+        .cell.open { background: #475569; cursor: default; }
+        .cell.star { background: #10b981; }
+        .cell.bomb { background: #ef4444; }
+        .controls { padding: 20px; }
+        input { padding: 10px; border-radius: 5px; border: none; width: 80px; margin-right: 10px; }
+        button { padding: 10px 20px; border-radius: 5px; border: none; background: #3b82f6; color: white; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #64748b; }
+        #cashout-btn { background: #10b981; display: none; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <span>DAG MINES</span>
-        <div class="balance-box">⭐ <span id="balance-val">0</span></div>
-    </div>
+<div id="balance-card">
+    <div>ТВОЙ БАЛАНС</div>
+    <div id="balance-val">Загрузка...</div>
+</div>
 
-    <div id="setup-area" class="menu">
-        <span class="label">СУММА СТАВКИ (⭐)</span>
-        <input type="number" id="bet-input" value="10" min="1">
-        <span class="label">УРОВЕНЬ СЛОЖНОСТИ</span>
-        <select id="difficulty">
-            <option value="3">Легко (3 мины) - x1.12</option>
-            <option value="5" selected>Средне (5 мин) - x1.23</option>
-            <option value="10">Сложно (10 мин) - x1.65</option>
-            <option value="15">Экстрим (15 мин) - x2.40</option>
-        </select>
-        <button class="btn-start" onclick="startGame()">ИГРАТЬ</button>
-    </div>
+<div class="grid" id="grid"></div>
 
-    <div id="game-area">
-        <div id="info" style="display:none">Множитель: <span id="mult">x1.00</span></div>
-        <div class="grid" id="grid"></div>
-        <button id="cashout-btn" class="btn-cashout" onclick="cashOut()">ЗАБРАТЬ <span id="win-amount">0</span> ⭐</button>
-    </div>
+<div class="controls">
+    <input type="number" id="bet-input" value="10" min="1">
+    <button id="start-btn" onclick="startGame()">ИГРАТЬ</button>
+    <button id="cashout-btn" onclick="cashOut()">ЗАБРАТЬ</button>
+</div>
 
-    <center>
-        <button class="btn-exit" onclick="exitGame()">💾 ВЕРНУТЬСЯ В БОТ</button>
-    </center>
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.enableClosingConfirmation();
+    let balance = 0;
+    let bet = 0;
+    let mines = [];
+    let revealed = 0;
+    let gameActive = false;
+    let currentMultiplier = 1;
 
-        // --- ГЛОБАЛЬНАЯ АВТО-СИНХРОНИЗАЦИЯ ---
-        function getInitialBalance() {
-            const params = new URLSearchParams(window.location.search);
-            return parseInt(params.get('bal')) || 0;
+    // --- ЛОГИКА СИНХРОНИЗАЦИИ ---
+
+    async function loadInitialData() {
+        return new Promise((resolve) => {
+            // 1. Пытаемся получить баланс из Облака
+            tg.CloudStorage.getItem('user_balance', (err, value) => {
+                if (!err && value) {
+                    balance = parseInt(value);
+                    console.log("Баланс загружен из Облака:", balance);
+                } else {
+                    // 2. Если в облаке нет, берем из URL (первый вход)
+                    const params = new URLSearchParams(window.location.search);
+                    balance = parseInt(params.get('bal')) || 0;
+                    console.log("Баланс взят из URL:", balance);
+                }
+                updateUI();
+                resolve();
+            });
+        });
+    }
+
+    async function saveBalance() {
+        updateUI();
+        // Эффект "сохранения" (цифры чуть увеличиваются)
+        const el = document.getElementById('balance-val');
+        el.style.transform = "scale(1.1)";
+        setTimeout(() => el.style.transform = "scale(1)", 200);
+
+        // Сохраняем в Облако Telegram
+        tg.CloudStorage.setItem('user_balance', balance.toString(), (err) => {
+            if (err) console.error("Ошибка сохранения в Облако:", err);
+        });
+    }
+
+    function updateUI() {
+        document.getElementById('balance-val').innerText = balance + " ⭐";
+    }
+
+    // --- ЛОГИКА ИГРЫ ---
+
+    function createGrid() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        for (let i = 0; i < 25; i++) {
+            const cell = document.createElement('button');
+            cell.className = 'cell';
+            cell.dataset.index = i;
+            cell.onclick = () => openCell(i);
+            grid.appendChild(cell);
+        }
+    }
+
+    async function startGame() {
+        if (gameActive) return;
+        
+        const input = document.getElementById('bet-input');
+        bet = parseInt(input.value);
+
+        if (bet > balance || bet <= 0) {
+            alert("Недостаточно звезд!");
+            return;
         }
 
-        let currentBalance = getInitialBalance();
-        let bet = 0, mineCount = 0, bombs = [], gemsFound = 0, isGameOver = false;
-        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const growthRates = { "3": 0.12, "5": 0.23, "10": 0.65, "15": 1.40 };
+        // Списание
+        balance -= bet;
+        gameActive = true;
+        revealed = 0;
+        currentMultiplier = 1;
+        
+        // СИНХРОНИЗАЦИЯ после ставки
+        await saveBalance();
 
-        // ФУНКЦИЯ АВТОСОХРАНЕНИЯ (СРАЗУ В ТЕЛЕГРАМ И НА ЭКРАН)
-        function autoSave() {
-            document.getElementById('balance-val').innerText = currentBalance.toLocaleString();
-            // Сохраняем в облако (чтобы другие игры видели)
-            tg.CloudStorage.setItem('current_balance', currentBalance.toString());
-        }
-        autoSave();
-
-        function playSound(freq, type, duration) {
-            try {
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-                let osc = audioCtx.createOscillator();
-                let gain = audioCtx.createGain();
-                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                osc.connect(gain); gain.connect(audioCtx.destination);
-                osc.start(); osc.stop(audioCtx.currentTime + duration);
-            } catch(e) {}
+        // Генерация мин (3 мины)
+        mines = [];
+        while(mines.length < 3) {
+            let r = Math.floor(Math.random() * 25);
+            if(!mines.includes(r)) mines.push(r);
         }
 
-        function startGame() {
-            const betInput = document.getElementById('bet-input');
-            bet = parseInt(betInput.value);
-            mineCount = parseInt(document.getElementById('difficulty').value);
+        createGrid();
+        document.getElementById('start-btn').disabled = true;
+        document.getElementById('cashout-btn').style.display = 'inline-block';
+        document.getElementById('cashout-btn').innerText = `ЗАБРАТЬ`;
+    }
+
+    function openCell(idx) {
+        if (!gameActive) return;
+        const cells = document.getElementsByClassName('cell');
+        const cell = cells[idx];
+        if (cell.classList.contains('open')) return;
+
+        if (mines.includes(idx)) {
+            // ВЗРЫВ
+            cell.classList.add('open', 'bomb');
+            cell.innerText = '💣';
+            gameOver(false);
+        } else {
+            // ЗВЕЗДА
+            cell.classList.add('open', 'star');
+            cell.innerText = '⭐';
+            revealed++;
+            currentMultiplier += 0.5; // Упрощенный множитель
+            document.getElementById('cashout-btn').innerText = `ЗАБРАТЬ ${(bet * currentMultiplier).toFixed(0)}`;
             
-            if (isNaN(bet) || bet <= 0) return;
-            if (bet > currentBalance) {
-                tg.showAlert("Недостаточно звезд!"); return;
-            }
-
-            currentBalance -= bet;
-            autoSave(); // Сохраняем списание ставки
-            
-            playSound(440, 'sine', 0.1);
-            tg.HapticFeedback.impactOccurred('medium');
-            document.getElementById('setup-area').style.display = 'none';
-            document.getElementById('grid').style.display = 'grid';
-            document.getElementById('info').style.display = 'block';
-            initGrid();
+            if (revealed === 22) cashOut();
         }
+    }
 
-        function initGrid() {
-            const grid = document.getElementById('grid');
-            grid.innerHTML = ''; bombs = []; gemsFound = 0; isGameOver = false;
-            document.getElementById('mult').innerText = "x1.00";
-            document.getElementById('cashout-btn').style.display = 'none';
-            while(bombs.length < mineCount) {
-                let randomPos = Math.floor(Math.random() * 25);
-                if(!bombs.includes(randomPos)) bombs.push(randomPos);
-            }
-            for(let i=0; i<25; i++) {
-                let cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.onclick = () => openCell(i, cell);
-                grid.appendChild(cell);
-            }
-        }
+    async function cashOut() {
+        if (!gameActive) return;
+        let win = Math.floor(bet * currentMultiplier);
+        balance += win;
+        
+        // СИНХРОНИЗАЦИЯ после выигрыша
+        await saveBalance();
+        gameOver(true);
+    }
 
-        function openCell(idx, el) {
-            if(isGameOver || el.classList.contains('open')) return;
-            el.classList.add('open');
-            if(bombs.includes(idx)) {
-                el.classList.add('bomb'); el.innerText = '💥';
-                playSound(100, 'sawtooth', 0.4);
-                tg.HapticFeedback.notificationOccurred('error');
-                endGame(false);
-            } else {
-                el.classList.add('gem'); el.innerText = '💎';
-                gemsFound++;
-                playSound(600 + (gemsFound * 100), 'sine', 0.2);
-                tg.HapticFeedback.impactOccurred('light');
-                updateGameUI();
-            }
-        }
+    function gameOver(win) {
+        gameActive = false;
+        document.getElementById('start-btn').disabled = false;
+        document.getElementById('cashout-btn').style.display = 'none';
+        
+        // Показываем все мины
+        const cells = document.getElementsByClassName('cell');
+        mines.forEach(m => {
+            cells[m].classList.add('open', 'bomb');
+            cells[m].innerText = '💣';
+        });
 
-        function updateGameUI() {
-            let rate = growthRates[mineCount.toString()];
-            let multiplier = (1 + (gemsFound * rate)).toFixed(2);
-            let currentWin = Math.floor(bet * multiplier);
-            document.getElementById('mult').innerText = "x" + multiplier;
-            document.getElementById('win-amount').innerText = currentWin;
-            document.getElementById('cashout-btn').style.display = 'block';
-        }
+        // Отправка данных в бот при закрытии (опционально, для кнопки "Выход")
+        // tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
+    }
 
-        function cashOut() {
-            if(isGameOver || gemsFound === 0) return;
-            let win = parseInt(document.getElementById('win-amount').innerText);
-            currentBalance += win;
-            autoSave(); // Сохраняем выигрыш сразу
-            
-            playSound(800, 'sine', 0.3);
-            tg.HapticFeedback.notificationOccurred('success');
-            tg.showAlert("Вы выиграли " + win + " ⭐");
-            resetToMenu();
-        }
+    // Инициализация при загрузке
+    loadInitialData();
+    createGrid();
 
-        function endGame(isWin) {
-            isGameOver = true;
-            autoSave(); // Даже при проигрыше сохраняем состояние
-            if(!isWin) {
-                bombs.forEach(pos => {
-                    let c = document.getElementById('grid').children[pos];
-                    if (!c.classList.contains('open')) {
-                        c.classList.add('open'); c.innerText = '💣'; c.style.opacity = '0.5';
-                    }
-                });
-                setTimeout(resetToMenu, 2000);
-            }
-        }
-
-        function resetToMenu() {
-            document.getElementById('setup-area').style.display = 'block';
-            document.getElementById('grid').style.display = 'none';
-            document.getElementById('info').style.display = 'none';
-            document.getElementById('cashout-btn').style.display = 'none';
-        }
-
-        function exitGame() {
-            // Финальная отправка боту для записи в базу данных
-            tg.sendData(JSON.stringify({
-                action: "sync_balance", 
-                final_balance: currentBalance
-            }));
-        }
-    </script>
+</script>
 </body>
 </html>
