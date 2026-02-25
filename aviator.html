@@ -30,7 +30,6 @@
         #btn-cash { background: linear-gradient(180deg, #ffcc00, #d4ac00); color: #2b2100; display: none; }
         button:active { transform: scale(0.96); }
 
-        /* Окно после раунда */
         #modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:100; pointer-events:auto; backdrop-filter: blur(8px); }
         #modal-card { background: #1a1f2b; border: 2px solid #00f2ff; padding: 40px; border-radius: 30px; text-align: center; width: 80%; max-width: 320px; }
         .win { color: #00ff88; font-size: 45px; font-weight: 900; }
@@ -73,10 +72,27 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        tg.enableClosingConfirmation();
+
+        // --- УЛУЧШЕННОЕ ПОЛУЧЕНИЕ БАЛАНСА ---
+        function getInitialBalance() {
+            const params = new URLSearchParams(window.location.search);
+            let bal = params.get('bal');
+            if (!bal) {
+                for (let [key, value] of params.entries()) {
+                    if (key.includes('bal')) return parseInt(value);
+                }
+            }
+            return parseInt(bal) || 0;
+        }
+
+        let balance = getInitialBalance();
         
-        const urlParams = new URLSearchParams(window.location.search);
-        let balance = parseInt(urlParams.get('bal')) || 0;
-        document.getElementById('bal-display').innerText = balance;
+        function updateUI() {
+            document.getElementById('bal-display').innerText = balance.toLocaleString();
+            tg.CloudStorage.setItem('last_balance', balance.toString());
+        }
+        updateUI();
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -87,22 +103,20 @@
         let stars = [];
         for(let i=0; i<120; i++) stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: Math.random()*2+1});
 
-        // --- AUDIO ENGINE ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
 
         function playSound(freq, type, dur, vol=0.1) {
             try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = type;
                 osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
                 gain.gain.setValueAtTime(vol, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + dur);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + dur);
             } catch(e) {}
         }
 
@@ -112,7 +126,6 @@
             ctx.scale(scale, scale);
             ctx.rotate(-0.15);
 
-            // Flame
             if(isFlying) {
                 const fSize = 10 + Math.random()*15;
                 const g = ctx.createRadialGradient(-20,0,0, -30,0, fSize*2.5);
@@ -121,11 +134,9 @@
                 ctx.beginPath(); ctx.ellipse(-25, 0, fSize*3, fSize/1.5, 0, 0, Math.PI*2); ctx.fill();
             }
 
-            // Stabilizers
             ctx.fillStyle = "#444";
             ctx.beginPath(); ctx.moveTo(-10,-15); ctx.lineTo(-22,-22); ctx.lineTo(-22,22); ctx.lineTo(-10,15); ctx.fill();
             
-            // Body
             const grad = ctx.createLinearGradient(0, -12, 0, 12);
             grad.addColorStop(0, '#bdc3c7'); grad.addColorStop(0.5, '#ecf0f1'); grad.addColorStop(1, '#95a5a6');
             ctx.fillStyle = grad;
@@ -136,11 +147,9 @@
             ctx.bezierCurveTo(-20, 15, 40, 15, 40, 0);
             ctx.fill();
 
-            // Nose
             ctx.fillStyle = "#ff3e3e";
             ctx.beginPath(); ctx.moveTo(40,0); ctx.bezierCurveTo(40,-10, 25,-10, 25,0); ctx.bezierCurveTo(25,10, 40,10, 40,0); ctx.fill();
 
-            // Window
             ctx.fillStyle = "#1a1f2b";
             ctx.beginPath(); ctx.arc(8, 0, 6, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = "#00f2ff";
@@ -176,8 +185,6 @@
         }
 
         function startRound() {
-            if(audioCtx.state === 'suspended') audioCtx.resume();
-            
             bet = parseInt(document.getElementById('bet-input').value);
             if(isNaN(bet) || bet > balance || bet < 10) {
                 tg.showAlert("Check your bet/balance!");
@@ -185,9 +192,8 @@
             }
 
             balance -= bet;
-            document.getElementById('bal-display').innerText = balance;
+            updateUI();
 
-            // REALISTIC RNG
             let r = Math.random();
             if(r < 0.12) crashAt = 1.00 + Math.random()*0.05;
             else if(r < 0.75) crashAt = 1.1 + Math.pow(Math.random(), 1.5)*2.5;
@@ -212,7 +218,7 @@
 
         function endRound(win, amt=0) {
             isFlying = false;
-            document.getElementById('bal-display').innerText = balance;
+            updateUI();
             document.getElementById('modal').style.display = 'flex';
             const val = document.getElementById('modal-val');
             
@@ -236,7 +242,11 @@
         }
 
         function finalizeAndExit() {
-            tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
+            // Финальная синхронизация с ботом
+            tg.sendData(JSON.stringify({
+                action: "sync_balance", 
+                final_balance: balance
+            }));
         }
 
         animate();
