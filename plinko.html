@@ -42,7 +42,7 @@
             <input type="number" id="bet-input" value="10" min="10">
             <button id="btn-play" onclick="dropBall()">СТАВКА</button>
         </div>
-        <span class="exit-link" onclick="finalizeAndExit()">СОХРАНИТЬ И ВЫЙТИ</span>
+        <span class="exit-link" onclick="finalizeAndExit()">СОХРАНИТЬ И ВЫЙТИ В БОТА</span>
     </div>
 </div>
 
@@ -55,24 +55,20 @@
     const ctx = canvas.getContext('2d');
     const balDisplay = document.getElementById('bal-display');
     
-    // --- ИСПРАВЛЕННЫЙ БЛОК ПОЛУЧЕНИЯ БАЛАНСА ---
-    function getInitialBalance() {
+    // --- ГЛОБАЛЬНАЯ АВТО-СИНХРОНИЗАЦИЯ ---
+    function getActualBalance() {
         const params = new URLSearchParams(window.location.search);
-        let bal = params.get('bal');
-        if (!bal) {
-            // Если bal не найден напрямую, ищем перебором (на случай кривых ссылок)
-            for (let [key, value] of params.entries()) {
-                if (key.includes('bal')) return parseInt(value);
-            }
-        }
-        return parseInt(bal) || 0;
+        return parseInt(params.get('bal')) || 0;
     }
 
-    let balance = getInitialBalance();
-    balDisplay.innerText = balance.toLocaleString();
+    let balance = getActualBalance();
 
-    // Синхронизация с CloudStorage (дополнительный слой)
-    tg.CloudStorage.setItem('last_balance', balance.toString());
+    // ФУНКЦИЯ АВТОСОХРАНЕНИЯ
+    function autoSave() {
+        balDisplay.innerText = balance.toLocaleString();
+        tg.CloudStorage.setItem('current_balance', balance.toString());
+    }
+    autoSave();
 
     let currentRisk = 'med';
     let balls = [];
@@ -140,8 +136,9 @@
             tg.HapticFeedback.notificationOccurred('error');
             return;
         }
+        
         balance -= bet;
-        balDisplay.innerText = balance.toLocaleString();
+        autoSave(); // АВТОСОХРАНЕНИЕ: Списание ставки
         
         balls.push({ 
             x: canvas.width/2 + (Math.random()-0.5)*15, 
@@ -207,7 +204,8 @@
                 const mult = curB[idx];
                 
                 balance += Math.floor(b.bet * mult);
-                balDisplay.innerText = balance.toLocaleString();
+                autoSave(); // АВТОСОХРАНЕНИЕ: Начисление выигрыша/проигрыша
+                
                 bucketFlash[idx] = 30;
                 
                 if(mult >= 5) { 
@@ -221,9 +219,6 @@
                 
                 playPop(mult >= 1 ? 400 : 50);
                 balls.splice(i, 1);
-                
-                // Авто-сохранение в CloudStorage при каждом выигрыше
-                tg.CloudStorage.setItem('last_balance', balance.toString());
             }
         }
 
@@ -239,7 +234,7 @@
     }
 
     function finalizeAndExit() {
-        // Отправляем данные боту
+        // Отправляем данные боту для финальной синхронизации
         tg.sendData(JSON.stringify({
             action: "sync_balance", 
             final_balance: balance
