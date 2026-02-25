@@ -7,26 +7,19 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 0; overflow: hidden; }
-        
-        /* Хедер с балансом */
         .header { background: #222; padding: 10px 20px; border-bottom: 2px solid #f7941d; display: flex; justify-content: space-between; align-items: center; }
         .balance-box { color: #f7941d; font-weight: bold; font-size: 18px; text-shadow: 0 0 10px rgba(247, 148, 29, 0.3); }
-
         .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 320px; margin: 20px auto; display: none; }
         .cell { width: 55px; height: 55px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; border: 2px solid #444; transition: 0.2s; }
         .cell.open.gem { background: #2ecc71; border-color: #27ae60; box-shadow: 0 0 10px #2ecc71; }
         .cell.open.bomb { background: #e74c3c; border-color: #c0392b; animation: shake 0.2s; }
-        
         @keyframes shake { 0% {transform:translateX(0)} 25% {transform:translateX(5px)} 50% {transform:translateX(-5px)} 100% {transform:translateX(0)} }
-
         .menu { background: #222; padding: 20px; border-radius: 15px; border: 1px solid #444; margin: 15px; }
         select, input { width: 90%; padding: 12px; margin: 10px 0; background: #333; border: 1px solid #555; color: white; border-radius: 8px; font-size: 16px; text-align: center; outline: none; }
-        
         button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
         .btn-start { background: #f7941d; color: white; }
         .btn-cashout { background: #2ecc71; color: white; display: none; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4); }
         .btn-exit { background: #444; color: #ccc; font-size: 12px; padding: 10px 30px; width: auto; display: inline-block; margin-top: 10px; }
-        
         #info { margin-bottom: 15px; font-size: 18px; color: #f7941d; font-weight: bold; }
         .label { font-size: 12px; color: #aaa; margin-top: 5px; display: block; text-transform: uppercase; }
     </style>
@@ -41,7 +34,6 @@
     <div id="setup-area" class="menu">
         <span class="label">СУММА СТАВКИ (⭐)</span>
         <input type="number" id="bet-input" value="10" min="1">
-        
         <span class="label">УРОВЕНЬ СЛОЖНОСТИ</span>
         <select id="difficulty">
             <option value="3">Легко (3 мины) - x1.12</option>
@@ -49,7 +41,6 @@
             <option value="10">Сложно (10 мин) - x1.65</option>
             <option value="15">Экстрим (15 мин) - x2.40</option>
         </select>
-        
         <button class="btn-start" onclick="startGame()">ИГРАТЬ</button>
     </div>
 
@@ -60,7 +51,7 @@
     </div>
 
     <center>
-        <button class="btn-exit" onclick="exitGame()">💾 СОХРАНИТЬ И ВЫЙТИ</button>
+        <button class="btn-exit" onclick="exitGame()">💾 ВЕРНУТЬСЯ В БОТ</button>
     </center>
 
     <script>
@@ -68,48 +59,35 @@
         tg.expand();
         tg.enableClosingConfirmation();
 
-        // --- УЛУЧШЕННОЕ ПОЛУЧЕНИЕ БАЛАНСА ---
+        // --- ГЛОБАЛЬНАЯ АВТО-СИНХРОНИЗАЦИЯ ---
         function getInitialBalance() {
             const params = new URLSearchParams(window.location.search);
-            let bal = params.get('bal');
-            if (!bal) {
-                for (let [key, value] of params.entries()) {
-                    if (key.includes('bal')) return parseInt(value);
-                }
-            }
-            return parseInt(bal) || 0;
+            return parseInt(params.get('bal')) || 0;
         }
 
         let currentBalance = getInitialBalance();
-        let bet = 0;
-        let mineCount = 0;
-        let bombs = [];
-        let gemsFound = 0;
-        let isGameOver = false;
+        let bet = 0, mineCount = 0, bombs = [], gemsFound = 0, isGameOver = false;
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
         const growthRates = { "3": 0.12, "5": 0.23, "10": 0.65, "15": 1.40 };
 
-        function updateBalanceUI() {
+        // ФУНКЦИЯ АВТОСОХРАНЕНИЯ (СРАЗУ В ТЕЛЕГРАМ И НА ЭКРАН)
+        function autoSave() {
             document.getElementById('balance-val').innerText = currentBalance.toLocaleString();
-            // Подстраховка в CloudStorage
-            tg.CloudStorage.setItem('last_balance', currentBalance.toString());
+            // Сохраняем в облако (чтобы другие игры видели)
+            tg.CloudStorage.setItem('current_balance', currentBalance.toString());
         }
-        updateBalanceUI();
+        autoSave();
 
         function playSound(freq, type, duration) {
             try {
                 if (audioCtx.state === 'suspended') audioCtx.resume();
                 let osc = audioCtx.createOscillator();
                 let gain = audioCtx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
                 gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + duration);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
             } catch(e) {}
         }
 
@@ -120,15 +98,14 @@
             
             if (isNaN(bet) || bet <= 0) return;
             if (bet > currentBalance) {
-                tg.showAlert("Недостаточно звезд!");
-                return;
+                tg.showAlert("Недостаточно звезд!"); return;
             }
 
             currentBalance -= bet;
-            updateBalanceUI();
+            autoSave(); // Сохраняем списание ставки
+            
             playSound(440, 'sine', 0.1);
             tg.HapticFeedback.impactOccurred('medium');
-
             document.getElementById('setup-area').style.display = 'none';
             document.getElementById('grid').style.display = 'grid';
             document.getElementById('info').style.display = 'block';
@@ -137,18 +114,13 @@
 
         function initGrid() {
             const grid = document.getElementById('grid');
-            grid.innerHTML = '';
-            bombs = [];
-            gemsFound = 0;
-            isGameOver = false;
+            grid.innerHTML = ''; bombs = []; gemsFound = 0; isGameOver = false;
             document.getElementById('mult').innerText = "x1.00";
             document.getElementById('cashout-btn').style.display = 'none';
-
             while(bombs.length < mineCount) {
                 let randomPos = Math.floor(Math.random() * 25);
                 if(!bombs.includes(randomPos)) bombs.push(randomPos);
             }
-
             for(let i=0; i<25; i++) {
                 let cell = document.createElement('div');
                 cell.className = 'cell';
@@ -160,16 +132,13 @@
         function openCell(idx, el) {
             if(isGameOver || el.classList.contains('open')) return;
             el.classList.add('open');
-
             if(bombs.includes(idx)) {
-                el.classList.add('bomb');
-                el.innerText = '💥';
+                el.classList.add('bomb'); el.innerText = '💥';
                 playSound(100, 'sawtooth', 0.4);
                 tg.HapticFeedback.notificationOccurred('error');
                 endGame(false);
             } else {
-                el.classList.add('gem');
-                el.innerText = '💎';
+                el.classList.add('gem'); el.innerText = '💎';
                 gemsFound++;
                 playSound(600 + (gemsFound * 100), 'sine', 0.2);
                 tg.HapticFeedback.impactOccurred('light');
@@ -181,7 +150,6 @@
             let rate = growthRates[mineCount.toString()];
             let multiplier = (1 + (gemsFound * rate)).toFixed(2);
             let currentWin = Math.floor(bet * multiplier);
-            
             document.getElementById('mult').innerText = "x" + multiplier;
             document.getElementById('win-amount').innerText = currentWin;
             document.getElementById('cashout-btn').style.display = 'block';
@@ -191,7 +159,8 @@
             if(isGameOver || gemsFound === 0) return;
             let win = parseInt(document.getElementById('win-amount').innerText);
             currentBalance += win;
-            updateBalanceUI();
+            autoSave(); // Сохраняем выигрыш сразу
+            
             playSound(800, 'sine', 0.3);
             tg.HapticFeedback.notificationOccurred('success');
             tg.showAlert("Вы выиграли " + win + " ⭐");
@@ -200,18 +169,15 @@
 
         function endGame(isWin) {
             isGameOver = true;
+            autoSave(); // Даже при проигрыше сохраняем состояние
             if(!isWin) {
                 bombs.forEach(pos => {
                     let c = document.getElementById('grid').children[pos];
                     if (!c.classList.contains('open')) {
-                        c.classList.add('open');
-                        c.innerText = '💣';
-                        c.style.opacity = '0.5';
+                        c.classList.add('open'); c.innerText = '💣'; c.style.opacity = '0.5';
                     }
                 });
-                setTimeout(() => {
-                    resetToMenu();
-                }, 2000);
+                setTimeout(resetToMenu, 2000);
             }
         }
 
@@ -223,12 +189,11 @@
         }
 
         function exitGame() {
-            // Синхронизация с ботом
+            // Финальная отправка боту для записи в базу данных
             tg.sendData(JSON.stringify({
                 action: "sync_balance", 
                 final_balance: currentBalance
             }));
-            // Закрытие произойдет автоматически после sendData в Telegram
         }
     </script>
 </body>
