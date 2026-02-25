@@ -10,31 +10,17 @@
         :root { --neon: #00f2ff; --bg: #05070a; }
         body { margin: 0; background: var(--bg); font-family: 'Orbitron'; color: white; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        
         #ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
-        
         .top-bar { padding: 10px; pointer-events: auto; }
         .badge { background: rgba(0,0,0,0.8); border: 1px solid var(--neon); padding: 8px 15px; border-radius: 10px; color: var(--neon); font-size: 16px; display: inline-block; box-shadow: 0 0 10px rgba(0,242,255,0.2); }
-
-        /* Компактная панель, не закрывающая слоты */
-        #controls { 
-            background: rgba(20, 25, 35, 0.9); 
-            padding: 15px; 
-            pointer-events: auto; 
-            border-top: 1px solid #333;
-            backdrop-filter: blur(5px);
-        }
-        
+        #controls { background: rgba(20, 25, 35, 0.9); padding: 15px; pointer-events: auto; border-top: 1px solid #333; backdrop-filter: blur(5px); }
         .risk-bar { display: flex; gap: 5px; margin-bottom: 10px; }
         .risk-btn { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #111; color: #666; font-family: 'Orbitron'; font-size: 10px; cursor: pointer; }
         .risk-btn.active { border-color: var(--neon); color: var(--neon); background: rgba(0,242,255,0.1); }
-
         .bet-row { display: flex; gap: 10px; margin-bottom: 10px; }
         input { flex: 1; background: #000; border: 1px solid #333; color: white; text-align: center; border-radius: 8px; font-family: 'Orbitron'; font-size: 16px; outline: none; }
-        
         #btn-play { flex: 2; padding: 12px; border-radius: 8px; border: none; font-family: 'Orbitron'; font-weight: 900; background: linear-gradient(180deg, #00f2ff, #0077ff); color: #000; cursor: pointer; text-transform: uppercase; }
-        
-        .exit-link { display: block; margin-top: 8px; color: #444; font-size: 9px; text-decoration: none; text-align: center; }
+        .exit-link { display: block; margin-top: 8px; color: #444; font-size: 9px; text-decoration: none; text-align: center; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -63,13 +49,30 @@
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
+    tg.enableClosingConfirmation(); // Защита от случайного закрытия без сохранения
 
     const canvas = document.getElementById('plinkoCanvas');
     const ctx = canvas.getContext('2d');
     const balDisplay = document.getElementById('bal-display');
     
-    let balance = parseInt(new URLSearchParams(window.location.search).get('bal')) || 0;
+    // --- ИСПРАВЛЕННЫЙ БЛОК ПОЛУЧЕНИЯ БАЛАНСА ---
+    function getInitialBalance() {
+        const params = new URLSearchParams(window.location.search);
+        let bal = params.get('bal');
+        if (!bal) {
+            // Если bal не найден напрямую, ищем перебором (на случай кривых ссылок)
+            for (let [key, value] of params.entries()) {
+                if (key.includes('bal')) return parseInt(value);
+            }
+        }
+        return parseInt(bal) || 0;
+    }
+
+    let balance = getInitialBalance();
     balDisplay.innerText = balance.toLocaleString();
+
+    // Синхронизация с CloudStorage (дополнительный слой)
+    tg.CloudStorage.setItem('last_balance', balance.toString());
 
     let currentRisk = 'med';
     let balls = [];
@@ -78,7 +81,6 @@
     let bucketFlash = [];
     let shakeAmount = 0;
 
-    // ЗВУКОВОЙ ДВИЖОК
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playPop(freq = 150) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -117,9 +119,7 @@
     function createExplosion(x, y, color) {
         for (let i = 0; i < 12; i++) {
             particles.push({
-                x, y,
-                vx: (Math.random() - 0.5) * 8,
-                vy: (Math.random() - 0.5) * 8,
+                x, y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
                 life: 40, color: color
             });
         }
@@ -134,17 +134,18 @@
     }
 
     function dropBall() {
-        const bet = parseInt(document.getElementById('bet-input').value);
-        if (bet > balance || bet < 1) return;
+        const betInput = document.getElementById('bet-input');
+        const bet = parseInt(betInput.value);
+        if (isNaN(bet) || bet > balance || bet < 1) {
+            tg.HapticFeedback.notificationOccurred('error');
+            return;
+        }
         balance -= bet;
         balDisplay.innerText = balance.toLocaleString();
         
-        // Хаотичный спавн
         balls.push({ 
             x: canvas.width/2 + (Math.random()-0.5)*15, 
-            y: 30, 
-            vx: (Math.random()-0.5)*3, 
-            vy: 0, 
+            y: 30, vx: (Math.random()-0.5)*3, vy: 0, 
             bet, risk: currentRisk 
         });
         playPop(200);
@@ -154,7 +155,6 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         
-        // Эффект тряски
         ctx.save();
         if(shakeAmount > 0) {
             ctx.translate((Math.random()-0.5)*shakeAmount, (Math.random()-0.5)*shakeAmount);
@@ -171,7 +171,7 @@
 
         const conf = config[currentRisk];
         const bW = canvas.width / conf.buckets.length;
-        const bY = canvas.height - 180; // Подняли выше, чтобы не закрывало панелью
+        const bY = canvas.height - 180; 
 
         conf.buckets.forEach((m, i) => {
             ctx.fillStyle = m >= 1 ? "#00ff44" : "#ff4444";
@@ -184,8 +184,6 @@
 
         for (let i = balls.length - 1; i >= 0; i--) {
             let b = balls[i];
-            
-            // "Азартная" физика: микро-ветер
             b.vx += (Math.random() - 0.5) * 0.1;
             b.vy += 0.35; b.x += b.vx; b.y += b.vy;
 
@@ -200,8 +198,7 @@
                 }
             });
 
-            ctx.fillStyle = "#00f2ff"; ctx.shadowBlur = 10; ctx.shadowColor = "#00f2ff";
-            ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+            ctx.fillStyle = "#00f2ff"; ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill();
 
             if (b.y > bY) {
                 let idx = Math.floor(b.x / bW);
@@ -213,11 +210,20 @@
                 balDisplay.innerText = balance.toLocaleString();
                 bucketFlash[idx] = 30;
                 
-                if(mult >= 5) { shakeAmount = 15; createExplosion(b.x, bY, "#ffaa00"); }
-                else { createExplosion(b.x, bY, mult >= 1 ? "#00ff00" : "#ff0000"); }
+                if(mult >= 5) { 
+                    shakeAmount = 15; 
+                    createExplosion(b.x, bY, "#ffaa00"); 
+                    tg.HapticFeedback.notificationOccurred('success');
+                } else { 
+                    createExplosion(b.x, bY, mult >= 1 ? "#00ff00" : "#ff0000"); 
+                    tg.HapticFeedback.impactOccurred('medium');
+                }
                 
                 playPop(mult >= 1 ? 400 : 50);
                 balls.splice(i, 1);
+                
+                // Авто-сохранение в CloudStorage при каждом выигрыше
+                tg.CloudStorage.setItem('last_balance', balance.toString());
             }
         }
 
@@ -233,7 +239,11 @@
     }
 
     function finalizeAndExit() {
-        tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
+        // Отправляем данные боту
+        tg.sendData(JSON.stringify({
+            action: "sync_balance", 
+            final_balance: balance
+        }));
     }
 
     initPins();
