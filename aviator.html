@@ -1,144 +1,376 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AVIATOR STARS</title>
+    <title>ULTRA MINES HUB</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #050505; font-family: 'Roboto'; color: white; overflow: hidden; touch-action: none; }
-        .top-bar { display: flex; justify-content: space-between; padding: 15px; background: #1b1c1d; border-bottom: 2px solid #e11d48; }
-        .balance-box { color: #fbbf24; font-size: 18px; font-weight: 900; }
-        #game-area { height: 60vh; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        #multiplier { font-size: 60px; font-weight: 900; color: white; z-index: 10; text-shadow: 0 0 20px rgba(225,29,72,0.5); }
-        .plane { position: absolute; bottom: 50px; left: 50px; width: 80px; transition: transform 0.1s linear; z-index: 5; }
-        .controls { padding: 20px; background: #1b1c1d; height: 30vh; display: flex; flex-direction: column; gap: 10px; }
-        input { background: #000; border: 1px solid #333; color: white; padding: 15px; border-radius: 10px; font-size: 20px; text-align: center; }
-        #main-btn { background: #10b981; border: none; color: white; padding: 20px; border-radius: 10px; font-size: 22px; font-weight: 900; cursor: pointer; text-transform: uppercase; }
-        #main-btn.betting { background: #e11d48; }
-        .exit-btn { text-align: center; color: #666; font-size: 12px; margin-top: 10px; cursor: pointer; }
+        :root {
+            --primary: #00f2ff;
+            --bg: #0a0b10;
+            --card: #161b22;
+            --accent: #ff0055;
+            --gold: #ffcc00;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            background: var(--card);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+            perspective: 1000px;
+        }
+
+        .cell {
+            aspect-ratio: 1/1;
+            background: #21262d;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            transform-style: preserve-3d;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .cell:hover {
+            background: #30363d;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        .cell.reveal {
+            transform: rotateY(180deg);
+            background: #2ea043;
+        }
+
+        .cell.mine {
+            background: var(--accent) !important;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        input, select {
+            flex: 1;
+            background: transparent;
+            border: 1px solid #30363d;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        button {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, var(--primary), #0066ff);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            filter: brightness(1.2);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #30363d;
+            cursor: not-allowed;
+        }
+
+        .cashout {
+            background: linear-gradient(45deg, #238636, #2ea043);
+            display: none;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            50% { transform: translate(-1px, 2px) rotate(1deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake { animation: shake 0.5s; }
+
+        #particles {
+            position: absolute;
+            top: 0; left: 0; pointer-events: none;
+            width: 100%; height: 100%;
+        }
     </style>
 </head>
 <body>
 
-<div class="top-bar">
-    <div style="color: #e11d48;">AVIATOR</div>
-    <div class="balance-box">⭐ <span id="balance-val">0</span></div>
-</div>
+<div id="game-container">
+    <canvas id="particles"></canvas>
+    
+    <div class="header">
+        <div id="bal-display">💰 0</div>
+        <div id="multi-display">x1.00</div>
+    </div>
 
-<div id="game-area">
-    <div id="multiplier">1.00x</div>
-    <img src="https://cdn-icons-png.flaticon.com/512/3122/3122330.png" class="plane" id="plane" style="filter: invert(1) sepia(1) saturate(5) hue-rotate(320deg);">
-</div>
+    <div id="grid"></div>
 
-<div class="controls">
-    <input type="number" id="bet-input" value="10">
-    <button id="main-btn" onclick="handleAction()">СТАВКА</button>
-    <div class="exit-btn" onclick="finalizeAndExit()">СОХРАНИТЬ И ВЫЙТИ</div>
+    <div class="controls">
+        <div class="input-group">
+            <input type="number" id="bet-amount" placeholder="Ставка" value="10">
+            <select id="mine-count">
+                <option value="1">1 мина</option>
+                <option value="3" selected>3 мины</option>
+                <option value="5">5 мин</option>
+                <option value="10">10 мин</option>
+                <option value="24">24 мины</option>
+            </select>
+        </div>
+        <button id="start-btn">Начать игру</button>
+        <button id="cashout-btn" class="cashout">Забрать: 0 ⭐</button>
+    </div>
 </div>
 
 <script>
+    // --- ИНТЕГРАЦИЯ TELEGRAM ---
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    let balance = 0;
-    let currentBet = 0;
-    let gameActive = false;
-    let multiplier = 1.00;
-    let interval;
+    // Считываем баланс из URL (переданный ботом)
+    const urlParams = new URLSearchParams(window.location.search);
+    let balance = parseInt(urlParams.get('bal')) || 1000;
 
-    // --- СИНХРОНИЗАЦИЯ ---
-    async function syncData() {
-        return new Promise((resolve) => {
-            tg.CloudStorage.getItem('user_balance', (err, value) => {
-                if (!err && value) {
-                    balance = parseInt(value);
-                } else {
-                    const params = new URLSearchParams(window.location.search);
-                    balance = parseInt(params.get('bal')) || 0;
-                }
-                updateUI();
-                resolve();
-            });
-        });
+    let bet = 0;
+    let mines = [];
+    let revealed = 0;
+    let isGameOver = true;
+    const gridSize = 25;
+
+    const gridEl = document.getElementById('grid');
+    const startBtn = document.getElementById('start-btn');
+    const cashoutBtn = document.getElementById('cashout-btn');
+    const balDisplay = document.getElementById('bal-display');
+    const multiDisplay = document.getElementById('multi-display');
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(freq, type, duration) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
     }
 
-    function saveBalance() {
-        updateUI();
-        tg.CloudStorage.setItem('user_balance', balance.toString());
-    }
-
-    function updateUI() {
-        document.getElementById('balance-val').innerText = balance.toLocaleString();
-    }
-
-    // --- ЛОГИКА ---
-    function handleAction() {
-        const btn = document.getElementById('main-btn');
-        if (!gameActive) {
-            const input = document.getElementById('bet-input');
-            currentBet = parseInt(input.value);
-            if (currentBet > balance || currentBet < 1) return;
-
-            balance -= currentBet;
-            saveBalance(); // Списание
-            
-            gameActive = true;
-            btn.innerText = "ЗАБРАТЬ";
-            btn.classList.add('betting');
-            startRound();
-        } else {
-            cashOut();
+    function initGrid() {
+        gridEl.innerHTML = '';
+        for (let i = 0; i < gridSize; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.dataset.index = i;
+            cell.addEventListener('click', () => handleCellClick(i, cell));
+            gridEl.appendChild(cell);
         }
     }
 
-    function startRound() {
-        multiplier = 1.00;
-        const plane = document.getElementById('plane');
-        const multDisplay = document.getElementById('multiplier');
+    function combinations(n, k) {
+        if (k < 0 || k > n) return 0;
+        if (k === 0 || k === n) return 1;
+        if (k > n / 2) k = n - k;
+        let res = 1;
+        for (let i = 1; i <= k; i++) res = res * (n - i + 1) / i;
+        return res;
+    }
+
+    function calculateMultiplier() {
+        const mineCount = parseInt(document.getElementById('mine-count').value);
+        if (revealed === 0) return "1.00";
+        const prob = combinations(gridSize - mineCount, revealed) / combinations(gridSize, revealed);
+        return (0.95 / prob).toFixed(2);
+    }
+
+    startBtn.onclick = () => {
+        const amount = parseInt(document.getElementById('bet-amount').value);
+        if (amount > balance || amount <= 0) {
+            tg.HapticFeedback.notificationOccurred('error');
+            return alert("Недостаточно баланса!");
+        }
+
+        balance -= amount;
+        bet = amount;
+        isGameOver = false;
+        revealed = 0;
+        mines = [];
         
-        interval = setInterval(() => {
-            multiplier += 0.01;
-            multDisplay.innerText = multiplier.toFixed(2) + "x";
+        const mineCount = parseInt(document.getElementById('mine-count').value);
+        while(mines.length < mineCount) {
+            let r = Math.floor(Math.random() * gridSize);
+            if(!mines.includes(r)) mines.push(r);
+        }
+
+        updateUI();
+        initGrid();
+        startBtn.disabled = true;
+        cashoutBtn.style.display = 'block';
+        cashoutBtn.innerText = `Забрать: ${bet} ⭐`;
+        playSound(440, 'sine', 0.2);
+        tg.HapticFeedback.impactOccurred('medium');
+    };
+
+    function handleCellClick(index, el) {
+        if (isGameOver || el.classList.contains('reveal')) return;
+
+        if (mines.includes(index)) {
+            gameOver(false);
+            el.classList.add('mine');
+            el.innerHTML = '💣';
+            tg.HapticFeedback.notificationOccurred('error');
+        } else {
+            revealed++;
+            el.classList.add('reveal');
+            el.innerHTML = '⭐'; // Поменяли на звезды
+            playSound(600 + (revealed * 50), 'sine', 0.1);
+            tg.HapticFeedback.impactOccurred('light');
             
-            // Анимация полета
-            plane.style.transform = `translate(${multiplier * 10}px, -${multiplier * 15}px)`;
-
-            // Вероятность взлета (улета)
-            if (Math.random() < 0.005) {
-                flyAway();
-            }
-        }, 100);
+            const mult = calculateMultiplier();
+            multiDisplay.innerText = `x${mult}`;
+            cashoutBtn.innerText = `Забрать: ${(bet * mult).toFixed(0)} ⭐`;
+            
+            if (revealed === gridSize - mines.length) gameOver(true);
+        }
     }
 
-    function cashOut() {
-        clearInterval(interval);
-        let win = Math.floor(currentBet * multiplier);
-        balance += win;
-        saveBalance(); // Начисление выигрыша
-        resetGame("ВЫИГРЫШ: " + win);
+    cashoutBtn.onclick = () => {
+        if (isGameOver) return;
+        const mult = calculateMultiplier();
+        balance += Math.floor(bet * mult);
+        gameOver(true);
+        playSound(800, 'square', 0.3);
+        tg.HapticFeedback.notificationOccurred('success');
+    };
+
+    function gameOver(isWin) {
+        isGameOver = true;
+        startBtn.disabled = false;
+        cashoutBtn.style.display = 'none';
+        
+        if (!isWin) {
+            document.getElementById('game-container').classList.add('shake');
+            setTimeout(() => document.getElementById('game-container').classList.remove('shake'), 500);
+            playSound(100, 'sawtooth', 0.5);
+            document.querySelectorAll('.cell').forEach((cell, idx) => {
+                if (mines.includes(idx)) {
+                    cell.classList.add('mine');
+                    cell.innerHTML = '💣';
+                }
+            });
+        }
+
+        updateUI();
+
+        // СИНХРОНИЗАЦИЯ: Отправляем данные боту
+        tg.sendData(JSON.stringify({
+            action: "sync_balance",
+            final_balance: Math.floor(balance)
+        }));
     }
 
-    function flyAway() {
-        clearInterval(interval);
-        resetGame("УЛЕТЕЛ!");
+    function updateUI() {
+        balDisplay.innerText = `💰 ${balance.toFixed(0)}`;
+        if (isGameOver) multiDisplay.innerText = `x1.00`;
     }
 
-    function resetGame(msg) {
-        gameActive = false;
-        const btn = document.getElementById('main-btn');
-        btn.innerText = "СТАВКА";
-        btn.classList.remove('betting');
-        document.getElementById('multiplier').innerText = msg;
-        document.getElementById('plane').style.transform = "translate(0,0)";
-    }
+    // --- ФИЗИКА ЧАСТИЦ ---
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; }
+    window.onresize = resize; resize();
 
-    function finalizeAndExit() {
-        tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.size = Math.random() * 2;
+            this.speedX = Math.random() * 0.5 - 0.25;
+            this.speedY = Math.random() * 0.5 - 0.25;
+        }
+        update() {
+            this.x += this.speedX; this.y += this.speedY;
+            if (this.x > canvas.width) this.x = 0;
+            if (this.y > canvas.height) this.y = 0;
+        }
+        draw() {
+            ctx.fillStyle = 'rgba(0, 242, 255, 0.2)';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+        }
     }
+    for (let i = 0; i < 50; i++) particles.push(new Particle());
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        requestAnimationFrame(animate);
+    }
+    animate();
 
-    syncData();
+    initGrid();
+    updateUI();
 </script>
 </body>
 </html>
