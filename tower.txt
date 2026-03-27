@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TOWER AUTO-SYNC</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary: #00f2ff;
+            --bg: #0a0b10;
+            --card: #161b22;
+            --win: #2ea043;
+            --loss: #ff4d4d;
+        }
+
+        body {
+            margin: 0; background: var(--bg); color: white;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden; display: flex; flex-direction: column;
+            align-items: center; height: 100vh;
+        }
+
+        #game-wrapper {
+            width: 100%; max-width: 400px; height: 100%;
+            display: flex; flex-direction: column; padding: 15px; box-sizing: border-box;
+        }
+
+        .header {
+            display: flex; justify-content: space-between; padding: 10px 5px;
+            font-weight: 800; font-size: 1.2rem; color: var(--primary);
+            text-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+        }
+
+        #debug-info { font-size: 10px; color: rgba(255,255,255,0.2); text-align: center; margin-bottom: 5px; }
+
+        .tower-container {
+            flex-grow: 1; display: flex; flex-direction: column-reverse;
+            gap: 8px; overflow-y: auto; padding: 10px;
+            background: rgba(255,255,255,0.02); border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .row {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            opacity: 0.3; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 5px; border-radius: 12px;
+        }
+
+        .row.active { opacity: 1; background: rgba(0, 242, 255, 0.08); border: 1px solid var(--primary); }
+
+        .cell {
+            aspect-ratio: 2.2/1; background: var(--card); border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        .cell:active { transform: scale(0.95); }
+        .cell.correct { background: var(--win); border-color: #3fb950; box-shadow: 0 0 15px rgba(46, 160, 67, 0.4); }
+        .cell.wrong { background: var(--loss); border-color: #f85149; }
+
+        .ui-panel {
+            background: var(--card); padding: 20px; border-radius: 24px 24px 0 0;
+            border-top: 1px solid rgba(255,255,255,0.1); margin-top: 15px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+        }
+
+        .controls { display: flex; flex-direction: column; gap: 12px; }
+        
+        input {
+            width: 100%; background: #0d1117; border: 1px solid #30363d;
+            color: white; padding: 14px; border-radius: 12px; box-sizing: border-box;
+            font-size: 16px; text-align: center; outline: none;
+        }
+
+        button {
+            padding: 16px; border: none; border-radius: 14px;
+            font-weight: 900; text-transform: uppercase; cursor: pointer;
+            letter-spacing: 1px; transition: 0.3s;
+        }
+
+        #start-btn { background: linear-gradient(135deg, #00f2ff, #0066ff); color: white; }
+        #cashout-btn { 
+            background: linear-gradient(135deg, #2ea043, #238636); 
+            color: white; display: none; 
+            box-shadow: 0 0 20px rgba(46, 160, 67, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div class="header">
+        <div id="bal-display">💰 0</div>
+        <div>TOWER PREMIUM</div>
+    </div>
+    <div id="debug-info">SYNC ACTIVE</div>
+
+    <div class="tower-container" id="tower"></div>
+
+    <div class="ui-panel">
+        <div class="controls">
+            <input type="number" id="bet-amount" value="10" min="1">
+            <button id="start-btn">НАЧАТЬ ИГРУ</button>
+            <button id="cashout-btn">ЗАБРАТЬ: 0 ⭐</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let balance = parseInt(urlParams.get('bal')) || 0;
+    
+    const tower = document.getElementById('tower');
+    const balDisplay = document.getElementById('bal-display');
+    const startBtn = document.getElementById('start-btn');
+    const cashoutBtn = document.getElementById('cashout-btn');
+
+    let currentLevel = 0;
+    let isGameOver = true;
+    let currentBet = 0;
+    const MAX_LEVELS = 8;
+
+    function createTower() {
+        tower.innerHTML = '';
+        for (let i = 0; i < MAX_LEVELS; i++) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.id = `row-${i}`;
+            for (let j = 0; j < 3; j++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.onclick = () => tapCell(i, j, cell);
+                row.appendChild(cell);
+            }
+            tower.appendChild(row);
+        }
+    }
+
+    function updateUI() {
+        balDisplay.innerText = `💰 ${balance}`;
+    }
+
+    function syncWithBot() {
+        tg.HapticFeedback.notificationOccurred('success');
+        tg.sendData(JSON.stringify({ 
+            action: "sync_balance", 
+            final_balance: balance 
+        }));
+    }
+
+    function startGame() {
+        const bet = parseInt(document.getElementById('bet-amount').value);
+        if (bet > balance || bet <= 0) {
+            tg.HapticFeedback.notificationOccurred('error');
+            return alert("Недостаточно звезд!");
+        }
+
+        balance -= bet;
+        currentBet = bet;
+        currentLevel = 0;
+        isGameOver = false;
+        
+        createTower();
+        updateUI();
+        document.getElementById(`row-0`).classList.add('active');
+
+        startBtn.style.display = 'none';
+        cashoutBtn.style.display = 'block';
+        cashoutBtn.innerText = `ЗАБРАТЬ: ${currentBet} ⭐`;
+        tg.HapticFeedback.impactOccurred('medium');
+    }
+
+    function tapCell(lvl, pos, cell) {
+        if (isGameOver || lvl !== currentLevel) return;
+
+        const minePos = Math.floor(Math.random() * 3);
+
+        if (pos === minePos) {
+            cell.classList.add('wrong');
+            cell.innerText = '💣';
+            tg.HapticFeedback.notificationOccurred('error');
+            isGameOver = true;
+            setTimeout(() => {
+                startBtn.style.display = 'block';
+                cashoutBtn.style.display = 'none';
+                updateUI();
+            }, 500);
+        } else {
+            cell.classList.add('correct');
+            cell.innerText = '💎';
+            tg.HapticFeedback.impactOccurred('light');
+            
+            currentLevel++;
+            currentBet = Math.floor(currentBet * 1.45);
+            cashoutBtn.innerText = `ЗАБРАТЬ: ${currentBet} ⭐`;
+
+            if (currentLevel >= MAX_LEVELS) {
+                balance += currentBet;
+                updateUI();
+                setTimeout(syncWithBot, 500);
+            } else {
+                document.querySelectorAll('.row').forEach(r => r.classList.remove('active'));
+                document.getElementById(`row-${currentLevel}`).classList.add('active');
+            }
+        }
+    }
+
+    startBtn.onclick = startGame;
+    
+    cashoutBtn.onclick = () => {
+        if (!isGameOver) {
+            balance += currentBet;
+            updateUI();
+            syncWithBot(); // Авто-сохранение и выход
+        }
+    };
+
+    createTower();
+    updateUI();
+</script>
+</body>
+</html>
