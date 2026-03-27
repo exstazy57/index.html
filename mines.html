@@ -2,189 +2,375 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Mines Stars</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ULTRA MINES HUB</title>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; margin: 0; overflow: hidden; }
-        #balance-card { background: #1e293b; padding: 15px; border-bottom: 2px solid #3b82f6; }
-        #balance-val { font-size: 24px; font-weight: bold; color: #fbbf24; transition: all 0.3s; }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 20px; max-width: 350px; margin: 0 auto; }
-        .cell { aspect-ratio: 1; background: #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; border: none; }
-        .cell.open { background: #475569; cursor: default; }
-        .cell.star { background: #10b981; }
-        .cell.bomb { background: #ef4444; }
-        .controls { padding: 20px; }
-        input { padding: 10px; border-radius: 5px; border: none; width: 80px; margin-right: 10px; }
-        button { padding: 10px 20px; border-radius: 5px; border: none; background: #3b82f6; color: white; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #64748b; }
-        #cashout-btn { background: #10b981; display: none; margin-top: 10px; }
+        :root {
+            --primary: #00f2ff;
+            --bg: #0a0b10;
+            --card: #161b22;
+            --accent: #ff0055;
+            --gold: #ffcc00;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            background: var(--card);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5), border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+            perspective: 1000px;
+        }
+
+        .cell {
+            aspect-ratio: 1/1;
+            background: #21262d;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            transform-style: preserve-3d;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .cell:hover {
+            background: #30363d;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        .cell.reveal {
+            transform: rotateY(180deg);
+            background: #2ea043;
+        }
+
+        .cell.mine {
+            background: var(--accent) !important;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        input, select {
+            flex: 1;
+            background: transparent;
+            border: 1px solid #30363d;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        button {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, var(--primary), #0066ff);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            filter: brightness(1.2);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #30363d;
+            cursor: not-allowed;
+        }
+
+        .cashout {
+            background: linear-gradient(45deg, #238636, #2ea043);
+            display: none;
+        }
+
+        /* Анимация взрыва */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            50% { transform: translate(-1px, 2px) rotate(1deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake { animation: shake 0.5s; }
+
+        /* Эффект частиц */
+        #particles {
+            position: absolute;
+            top: 0; left: 0; pointer-events: none;
+            width: 100%; height: 100%;
+        }
     </style>
 </head>
 <body>
 
-<div id="balance-card">
-    <div>ТВОЙ БАЛАНС</div>
-    <div id="balance-val">Загрузка...</div>
-</div>
+<div id="game-container">
+    <canvas id="particles"></canvas>
+    
+    <div class="header">
+        <div id="bal-display">💰 0</div>
+        <div id="multi-display">x1.00</div>
+    </div>
 
-<div class="grid" id="grid"></div>
+    <div id="grid"></div>
 
-<div class="controls">
-    <input type="number" id="bet-input" value="10" min="1">
-    <button id="start-btn" onclick="startGame()">ИГРАТЬ</button>
-    <button id="cashout-btn" onclick="cashOut()">ЗАБРАТЬ</button>
+    <div class="controls">
+        <div class="input-group">
+            <input type="number" id="bet-amount" placeholder="Ставка" value="10">
+            <select id="mine-count">
+                <option value="1">1 мина</option>
+                <option value="3" selected>3 мины</option>
+                <option value="5">5 мин</option>
+                <option value="10">10 мин</option>
+                <option value="24">24 мины</option>
+            </select>
+        </div>
+        <button id="start-btn">Начать игру</button>
+        <button id="cashout-btn" class="cashout">Забрать: 0 ⭐</button>
+    </div>
 </div>
 
 <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-
-    let balance = 0;
+    // --- КОНФИГУРАЦИЯ ---
+    let balance = 1000;
     let bet = 0;
     let mines = [];
     let revealed = 0;
-    let gameActive = false;
-    let currentMultiplier = 1;
+    let isGameOver = true;
+    const gridSize = 25;
 
-    // --- ЛОГИКА СИНХРОНИЗАЦИИ ---
+    const gridEl = document.getElementById('grid');
+    const startBtn = document.getElementById('start-btn');
+    const cashoutBtn = document.getElementById('cashout-btn');
+    const balDisplay = document.getElementById('bal-display');
+    const multiDisplay = document.getElementById('multi-display');
 
-    async function loadInitialData() {
-        return new Promise((resolve) => {
-            // 1. Пытаемся получить баланс из Облака
-            tg.CloudStorage.getItem('user_balance', (err, value) => {
-                if (!err && value) {
-                    balance = parseInt(value);
-                    console.log("Баланс загружен из Облака:", balance);
-                } else {
-                    // 2. Если в облаке нет, берем из URL (первый вход)
-                    const params = new URLSearchParams(window.location.search);
-                    balance = parseInt(params.get('bal')) || 0;
-                    console.log("Баланс взят из URL:", balance);
-                }
-                updateUI();
-                resolve();
-            });
-        });
+    // --- ЗВУКОВОЙ ДВИЖОК (Web Audio API) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(freq, type, duration) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
     }
 
-    async function saveBalance() {
-        updateUI();
-        // Эффект "сохранения" (цифры чуть увеличиваются)
-        const el = document.getElementById('balance-val');
-        el.style.transform = "scale(1.1)";
-        setTimeout(() => el.style.transform = "scale(1)", 200);
-
-        // Сохраняем в Облако Telegram
-        tg.CloudStorage.setItem('user_balance', balance.toString(), (err) => {
-            if (err) console.error("Ошибка сохранения в Облако:", err);
-        });
-    }
-
-    function updateUI() {
-        document.getElementById('balance-val').innerText = balance + " ⭐";
+    // --- ИНИЦИАЛИЗАЦИЯ СЕТКИ ---
+    function initGrid() {
+        gridEl.innerHTML = '';
+        for (let i = 0; i < gridSize; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.dataset.index = i;
+            cell.addEventListener('click', () => handleCellClick(i, cell));
+            gridEl.appendChild(cell);
+        }
     }
 
     // --- ЛОГИКА ИГРЫ ---
-
-    function createGrid() {
-        const grid = document.getElementById('grid');
-        grid.innerHTML = '';
-        for (let i = 0; i < 25; i++) {
-            const cell = document.createElement('button');
-            cell.className = 'cell';
-            cell.dataset.index = i;
-            cell.onclick = () => openCell(i);
-            grid.appendChild(cell);
+    function calculateMultiplier() {
+        const mineCount = parseInt(document.getElementById('mine-count').value);
+        let n = gridSize;
+        let m = mineCount;
+        let r = revealed;
+        
+        // Формула вероятности: (n-m)! / n! * (n-r)! / (n-m-r)!
+        function factorial(num) { return num <= 1 ? 1 : num * factorial(num - 1); }
+        function combinations(n, k) {
+            if (k < 0 || k > n) return 0;
+            if (k === 0 || k === n) return 1;
+            if (k > n / 2) k = n - k;
+            let res = 1;
+            for (let i = 1; i <= k; i++) res = res * (n - i + 1) / i;
+            return res;
         }
+
+        const prob = combinations(n - m, r) / combinations(n, r);
+        return (0.95 / prob).toFixed(2); // 0.95 - house edge
     }
 
-    async function startGame() {
-        if (gameActive) return;
-        
-        const input = document.getElementById('bet-input');
-        bet = parseInt(input.value);
+    startBtn.onclick = () => {
+        const amount = parseInt(document.getElementById('bet-amount').value);
+        if (amount > balance || amount <= 0) return alert("Недостаточно баланса!");
 
-        if (bet > balance || bet <= 0) {
-            alert("Недостаточно звезд!");
-            return;
-        }
-
-        // Списание
-        balance -= bet;
-        gameActive = true;
+        balance -= amount;
+        bet = amount;
+        isGameOver = false;
         revealed = 0;
-        currentMultiplier = 1;
-        
-        // СИНХРОНИЗАЦИЯ после ставки
-        await saveBalance();
-
-        // Генерация мин (3 мины)
         mines = [];
-        while(mines.length < 3) {
-            let r = Math.floor(Math.random() * 25);
+        
+        // Генерация мин
+        const mineCount = parseInt(document.getElementById('mine-count').value);
+        while(mines.length < mineCount) {
+            let r = Math.floor(Math.random() * gridSize);
             if(!mines.includes(r)) mines.push(r);
         }
 
-        createGrid();
-        document.getElementById('start-btn').disabled = true;
-        document.getElementById('cashout-btn').style.display = 'inline-block';
-        document.getElementById('cashout-btn').innerText = `ЗАБРАТЬ`;
-    }
+        updateUI();
+        initGrid();
+        startBtn.disabled = true;
+        cashoutBtn.style.display = 'block';
+        playSound(440, 'sine', 0.2);
+    };
 
-    function openCell(idx) {
-        if (!gameActive) return;
-        const cells = document.getElementsByClassName('cell');
-        const cell = cells[idx];
-        if (cell.classList.contains('open')) return;
+    function handleCellClick(index, el) {
+        if (isGameOver || el.classList.contains('reveal')) return;
 
-        if (mines.includes(idx)) {
-            // ВЗРЫВ
-            cell.classList.add('open', 'bomb');
-            cell.innerText = '💣';
+        if (mines.includes(index)) {
             gameOver(false);
+            el.classList.add('mine');
+            el.innerHTML = '💣';
         } else {
-            // ЗВЕЗДА
-            cell.classList.add('open', 'star');
-            cell.innerText = '⭐';
             revealed++;
-            currentMultiplier += 0.5; // Упрощенный множитель
-            document.getElementById('cashout-btn').innerText = `ЗАБРАТЬ ${(bet * currentMultiplier).toFixed(0)}`;
+            el.classList.add('reveal');
+            el.innerHTML = '💎';
+            playSound(600 + (revealed * 50), 'sine', 0.1);
             
-            if (revealed === 22) cashOut();
+            const mult = calculateMultiplier();
+            multiDisplay.innerText = `x${mult}`;
+            cashoutBtn.innerText = `Забрать: ${(bet * mult).toFixed(0)} ⭐`;
+            
+            if (revealed === gridSize - mines.length) gameOver(true);
         }
     }
 
-    async function cashOut() {
-        if (!gameActive) return;
-        let win = Math.floor(bet * currentMultiplier);
-        balance += win;
-        
-        // СИНХРОНИЗАЦИЯ после выигрыша
-        await saveBalance();
+    cashoutBtn.onclick = () => {
+        if (isGameOver) return;
+        const mult = calculateMultiplier();
+        balance += Math.floor(bet * mult);
         gameOver(true);
-    }
+        playSound(800, 'square', 0.3);
+    };
 
-    function gameOver(win) {
-        gameActive = false;
-        document.getElementById('start-btn').disabled = false;
-        document.getElementById('cashout-btn').style.display = 'none';
+    function gameOver(isWin) {
+        isGameOver = true;
+        startBtn.disabled = false;
+        cashoutBtn.style.display = 'none';
         
-        // Показываем все мины
-        const cells = document.getElementsByClassName('cell');
-        mines.forEach(m => {
-            cells[m].classList.add('open', 'bomb');
-            cells[m].innerText = '💣';
-        });
-
-        // Отправка данных в бот при закрытии (опционально, для кнопки "Выход")
-        // tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
+        if (!isWin) {
+            document.getElementById('game-container').classList.add('shake');
+            setTimeout(() => document.getElementById('game-container').classList.remove('shake'), 500);
+            playSound(100, 'sawtooth', 0.5);
+            // Показываем остальные мины
+            document.querySelectorAll('.cell').forEach((cell, idx) => {
+                if (mines.includes(idx)) {
+                    cell.classList.add('mine');
+                    cell.innerHTML = '💣';
+                }
+            });
+        }
+        updateUI();
     }
 
-    // Инициализация при загрузке
-    loadInitialData();
-    createGrid();
+    function updateUI() {
+        balDisplay.innerText = `💰 ${balance.toFixed(0)}`;
+        if (isGameOver) multiDisplay.innerText = `x1.00`;
+    }
 
+    // --- ФИЗИКА ЧАСТИЦ (ФОН) ---
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resize() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+    }
+    window.onresize = resize;
+    resize();
+
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.size = Math.random() * 2;
+            this.speedX = Math.random() * 0.5 - 0.25;
+            this.speedY = Math.random() * 0.5 - 0.25;
+        }
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            if (this.x > canvas.width) this.x = 0;
+            if (this.y > canvas.height) this.y = 0;
+        }
+        draw() {
+            ctx.fillStyle = 'rgba(0, 242, 255, 0.2)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    for (let i = 0; i < 50; i++) particles.push(new Particle());
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        requestAnimationFrame(animate);
+    }
+    animate();
+
+    // Начальный экран
+    initGrid();
+    updateUI();
 </script>
 </body>
 </html>
