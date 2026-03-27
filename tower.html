@@ -2,397 +2,360 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Omni-Hub: Tower Defense v4.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Omni-Hub Tower | Ultimate Secure</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* --- ДИЗАЙНЕРСКИЙ БЛОК (CSS3 + НЕОН) --- */
+        /* --- СТИЛИ (NEON DARK MODE) --- */
         :root {
-            --bg-dark: #0a0a0c;
-            --accent-gold: #ffcc00;
-            --accent-blue: #00d4ff;
-            --danger-red: #ff4d4d;
-            --success-green: #2ecc71;
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --border-glow: 0 0 15px rgba(0, 212, 255, 0.3);
+            --primary: #00f2ff;
+            --secondary: #7000ff;
+            --success: #00ff88;
+            --danger: #ff0055;
+            --bg: #050505;
+            --card: #121214;
+            --gold: #ffcc00;
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
         body {
+            background-color: var(--bg);
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background: var(--bg-dark);
-            color: white;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden; /* Запрет скролла для мобилок */
-            height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        /* Анимация фона */
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #0a0a0c 100%);
-            z-index: -1;
-        }
-
-        #app-container {
+        #ui-wrapper {
             width: 100%;
-            max-width: 500px;
-            padding: 20px;
+            max-width: 420px;
+            height: 100%;
             display: flex;
             flex-direction: column;
-            height: 100%;
+            padding: 16px;
+            gap: 12px;
         }
 
-        /* Шапка с балансом */
-        .header {
+        /* Header с балансом */
+        .game-header {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 15px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--glass-bg);
-            padding: 15px;
-            border-radius: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            margin-bottom: 20px;
-            box-shadow: var(--border-glow);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        .balance-label { font-size: 14px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px; }
-        .balance-value { font-size: 22px; font-weight: bold; color: var(--accent-gold); }
+        .bal-box span { font-size: 12px; color: #888; display: block; text-transform: uppercase; }
+        .bal-box b { font-size: 20px; color: var(--gold); }
+
+        .mult-box { text-align: right; }
+        .mult-box b { font-size: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(0,242,255,0.5); }
 
         /* Игровое поле */
-        #game-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-            perspective: 1000px;
+        .grid-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            justify-content: center;
         }
 
         .cell {
+            width: 22%;
             aspect-ratio: 1/1;
-            background: rgba(255, 255, 255, 0.08);
+            background: #1a1a1c;
+            border: 1px solid #2a2a2c;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 24px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
-            transform-style: preserve-3d;
+            overflow: hidden;
         }
 
-        .cell:active { transform: scale(0.9) translateZ(-10px); }
-        .cell.active { background: rgba(0, 212, 255, 0.2); border-color: var(--accent-blue); box-shadow: 0 0 15px rgba(0, 212, 255, 0.4); }
-        .cell.win { background: rgba(46, 204, 113, 0.3); border-color: var(--success-green); color: var(--success-green); }
-        .cell.loss { background: rgba(255, 77, 77, 0.3); border-color: var(--danger-red); }
-        .cell.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1); }
+        /* Состояния ячеек */
+        .cell.active-row { border-color: var(--primary); background: #1e2a2d; box-shadow: inset 0 0 10px rgba(0,242,255,0.1); }
+        .cell.win { background: rgba(0, 255, 136, 0.15); border-color: var(--success); color: var(--success); }
+        .cell.loss { background: rgba(255, 0, 85, 0.15); border-color: var(--danger); animation: shake 0.3s; }
+        .cell.disabled { opacity: 0.3; cursor: default; }
 
-        /* Панель управления */
-        .controls {
-            background: var(--glass-bg);
+        /* Контроллы */
+        .footer-controls {
+            background: var(--card);
+            border-top: 1px solid rgba(255,255,255,0.1);
             padding: 20px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px 24px 0 0;
+            margin: 0 -16px -16px -16px;
         }
 
-        .input-group { margin-bottom: 15px; }
-        label { display: block; font-size: 12px; margin-bottom: 5px; opacity: 0.6; }
+        .bet-input-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 15px;
+        }
+
         input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #000;
+            border: 1px solid #333;
+            color: #fff;
             padding: 12px;
-            border-radius: 10px;
-            color: white;
+            border-radius: 12px;
             font-size: 18px;
+            text-align: center;
             outline: none;
         }
 
-        button {
-            width: 100%;
-            padding: 15px;
+        .main-btn {
+            background: linear-gradient(135deg, var(--secondary), var(--primary));
+            color: #fff;
             border: none;
-            border-radius: 12px;
+            padding: 16px;
+            border-radius: 14px;
             font-size: 16px;
             font-weight: bold;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: 0.2s;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(112,0,255,0.3);
         }
 
-        .btn-play { background: linear-gradient(45deg, var(--accent-blue), #0056b3); color: white; box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3); }
-        .btn-cashout { background: linear-gradient(45deg, #27ae60, #2ecc71); color: white; display: none; }
-        button:disabled { background: #333; color: #777; box-shadow: none; cursor: not-allowed; }
-
-        /* История и Статистика */
-        .stats-footer {
-            margin-top: auto;
-            display: flex;
-            justify-content: space-around;
-            padding: 15px 0;
-            font-size: 12px;
-            opacity: 0.5;
+        .cashout-btn {
+            background: var(--success);
+            color: #000;
+            display: none;
         }
 
-        /* Анимации взрыва */
         @keyframes shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
-        .shake { animation: shake 0.5s infinite; }
+
+        /* Overlay */
+        #msg-overlay {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid var(--primary);
+            z-index: 100;
+            display: none;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
-<div id="app-container">
-    <div class="header">
-        <div>
-            <div class="balance-label">Игровой баланс</div>
-            <div id="balance" class="balance-value">0 ⭐</div>
+<div id="ui-wrapper">
+    <div class="game-header">
+        <div class="bal-box">
+            <span>Ваш счёт</span>
+            <b id="balance-display">0 ⭐</b>
         </div>
-        <div style="text-align: right;">
-            <div class="balance-label">Коэффициент</div>
-            <div id="multiplier" class="balance-value" style="color: var(--accent-blue)">x1.00</div>
+        <div class="mult-box">
+            <span>Множитель</span>
+            <b id="multiplier-display">x1.00</b>
         </div>
     </div>
 
-    <div id="game-grid">
+    <div class="grid-container" id="grid">
         </div>
 
-    <div class="controls">
-        <div class="input-group">
-            <label>Сумма ставки (звезды)</label>
-            <input type="number" id="bet-input" value="10" min="1">
+    <div class="footer-controls">
+        <div class="bet-input-wrap">
+            <input type="number" id="bet-field" value="10" placeholder="Ставка">
         </div>
-        <button id="btn-main" class="btn-play">Начать игру</button>
-        <button id="btn-cash" class="btn-cashout">Забрать выигрыш</button>
-    </div>
-
-    <div class="stats-footer">
-        <span>OmniHub Guard 4.0</span>
-        <span id="session-id">SID: ...</span>
-        <span>Secure Protocol: AES-CTR</span>
+        <button id="action-btn" class="main-btn">ИГРАТЬ</button>
+        <button id="cash-btn" class="main-btn cashout-btn">ЗАБРАТЬ</button>
     </div>
 </div>
 
+<div id="msg-overlay"></div>
+
 <script>
-    /* =================================================================
-       --- ЯДРО БЕЗОПАСНОСТИ И ЛОГИКИ (TRIPLE-LOCK JS) ---
-    ================================================================= */
-    
+    // --- ИНИЦИАЛИЗАЦИЯ TG WEBAPP ---
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.ready();
 
-    // 1. Инициализация параметров из URL (Уровень 1 шифра)
-    const urlParams = new URLSearchParams(window.location.search);
-    const CONFIG = {
-        uid: urlParams.get('uid'),
-        startBal: parseInt(urlParams.get('bal')) || 0,
-        ts: urlParams.get('ts'),
-        sign: urlParams.get('sign'),
-        salt: urlParams.get('s'),
-        rows: 8,
-        cols: 4
-    };
+    // --- ПАРАМЕТРЫ (3 уровня защиты) ---
+    const params = new URLSearchParams(window.location.search);
+    const UID = params.get('uid') || "dev_user";
+    const START_BAL = parseInt(params.get('bal')) || 1000; // Fail-safe
+    const TS = params.get('ts') || Date.now();
+    const SIGN = params.get('sign') || "dev_sign";
 
-    // Состояние игры
-    let state = {
-        balance: CONFIG.startBal,
-        currentBet: 0,
-        currentRow: 0,
-        isPlaying: false,
-        bombs: [],
-        history: [],
-        multiplier: 1.00
-    };
+    let balance = START_BAL;
+    let currentBet = 0;
+    let currentRow = 0;
+    let isPlaying = false;
+    let multiplier = 1.0;
+    let bombs = [];
 
-    // DOM Элементы
-    const elBalance = document.getElementById('balance');
-    const elMultiplier = document.getElementById('multiplier');
-    const elGrid = document.getElementById('game-grid');
-    const elBetInput = document.getElementById('bet-input');
-    const elBtnMain = document.getElementById('btn-main');
-    const elBtnCash = document.getElementById('btn-cash');
+    const elGrid = document.getElementById('grid');
+    const elBal = document.getElementById('balance-display');
+    const elMult = document.getElementById('multiplier-display');
+    const elBtn = document.getElementById('action-btn');
+    const elCash = document.getElementById('cash-btn');
+    const elInput = document.getElementById('bet-field');
 
-    /* --- УРОВЕНЬ 2: ГЕНЕРАЦИЯ СЕТКИ (SEED-BASED) --- */
-    function generateBombs() {
-        // Используем соль и время для детерминированной генерации
-        const bombs = [];
-        let seed = parseInt(CONFIG.ts.slice(-6)) + parseInt(CONFIG.uid.slice(-4));
-        
-        for(let i = 0; i < state.rows; i++) {
-            // Линейный конгруэнтный генератор (простейший)
-            seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-            bombs.push(seed % state.cols);
+    // 1. Seed-генератор бомб (Уровень 2 защиты)
+    function generateLevelBombs() {
+        let b = [];
+        let seed = parseInt(TS.toString().slice(-6));
+        for(let i=0; i<8; i++) {
+            seed = (seed * 16807) % 2147483647;
+            b.push(seed % 4);
         }
-        return bombs;
+        return b;
     }
 
-    function initGrid() {
+    // 2. Отрисовка поля
+    function renderGrid() {
         elGrid.innerHTML = '';
-        // Создаем сетку сверху вниз (от ряда 7 до 0)
-        for(let r = state.rows - 1; r >= 0; r--) {
-            for(let c = 0; c < state.cols; c++) {
+        for(let r=7; r>=0; r--) {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'row';
+            rowDiv.id = `row-${r}`;
+            for(let c=0; c<4; c++) {
                 const cell = document.createElement('div');
                 cell.className = 'cell disabled';
-                cell.dataset.row = r;
-                cell.dataset.col = c;
-                cell.id = `cell-${r}-${c}`;
-                cell.onclick = () => handleCellClick(r, c);
-                elGrid.appendChild(cell);
+                cell.id = `c-${r}-${c}`;
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                cell.addEventListener('click', () => handleStep(r, c));
+                rowDiv.appendChild(cell);
+            }
+            elGrid.appendChild(rowDiv);
+        }
+    }
+
+    function updateUI() {
+        elBal.innerText = `${balance} ⭐`;
+        elMult.innerText = `x${multiplier.toFixed(2)}`;
+    }
+
+    // 3. Логика хода
+    function handleStep(r, c) {
+        if(!isPlaying || r !== currentRow) return;
+
+        const cell = document.getElementById(`c-${r}-${c}`);
+        const bombCol = bombs[r];
+
+        if(c === bombCol) {
+            // ПРОИГРЫШ
+            cell.classList.add('loss');
+            cell.innerHTML = '💣';
+            tg.HapticFeedback.notificationOccurred('error');
+            endGame(false);
+        } else {
+            // УСПЕХ
+            cell.classList.add('win');
+            cell.innerHTML = '💎';
+            tg.HapticFeedback.impactOccurred('medium');
+            
+            currentRow++;
+            multiplier += (0.2 + (r * 0.1));
+            updateUI();
+
+            if(currentRow > 7) {
+                endGame(true);
+            } else {
+                highlightRow(currentRow);
             }
         }
     }
 
-    function updateBalanceUI() {
-        elBalance.innerText = `${state.balance.toLocaleString()} ⭐`;
-        elMultiplier.innerText = `x${state.multiplier.toFixed(2)}`;
-    }
-
-    /* --- ИГРОВАЯ ЛОГИКА --- */
-    function startGame() {
-        const bet = parseInt(elBetInput.value);
-        if(isNaN(bet) || bet <= 0 || bet > state.balance) {
-            tg.HapticFeedback.notificationOccurred('error');
-            return alert('Некорректная ставка!');
-        }
-
-        state.currentBet = bet;
-        state.balance -= bet;
-        state.isPlaying = true;
-        state.currentRow = 0;
-        state.multiplier = 1.00;
-        state.bombs = generateBombs();
-        state.history = [];
-
-        updateBalanceUI();
-        toggleUI(true);
-        activateRow(0);
-        
-        tg.HapticFeedback.impactOccurred('medium');
-    }
-
-    function activateRow(rowIdx) {
-        // Деактивируем всё
-        document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled'));
-        // Активируем нужный ряд
-        document.querySelectorAll(`.cell[data-row="${rowIdx}"]`).forEach(c => {
+    function highlightRow(idx) {
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('active-row'));
+        document.querySelectorAll(`.cell[data-r="${idx}"]`).forEach(c => {
             c.classList.remove('disabled');
-            c.classList.add('active');
+            c.classList.add('active-row');
         });
     }
 
-    function handleCellClick(r, c) {
-        if(!state.isPlaying || r !== state.currentRow) return;
-
-        const cell = document.getElementById(`cell-${r}-${c}`);
-        const bombCol = state.bombs[r];
-
-        if(c === bombCol) {
-            // ВЗРЫВ
-            gameOver(cell);
-        } else {
-            // УСПЕХ
-            cell.classList.remove('active');
-            cell.classList.add('win');
-            cell.innerHTML = '💎';
-            
-            state.currentRow++;
-            state.multiplier += 0.45 + (r * 0.1);
-            
-            tg.HapticFeedback.impactOccurred('light');
-
-            if(state.currentRow >= state.rows) {
-                cashout();
-            } else {
-                activateRow(state.currentRow);
-                elMultiplier.innerText = `x${state.multiplier.toFixed(2)}`;
-            }
+    // 4. Управление игрой
+    elBtn.onclick = () => {
+        if(isPlaying) return;
+        
+        currentBet = parseInt(elInput.value);
+        if(currentBet > balance || currentBet <= 0) {
+            return tg.showAlert("Недостаточно средств!");
         }
-    }
 
-    function gameOver(bombCell) {
-        state.isPlaying = false;
-        bombCell.classList.add('loss');
-        bombCell.innerHTML = '💣';
-        document.body.classList.add('shake');
-        
-        tg.HapticFeedback.notificationOccurred('error');
+        balance -= currentBet;
+        isPlaying = true;
+        currentRow = 0;
+        multiplier = 1.0;
+        bombs = generateLevelBombs();
 
-        setTimeout(() => {
-            document.body.classList.remove('shake');
-            syncAndClose();
-        }, 1500);
-    }
+        renderGrid();
+        highlightRow(0);
+        updateUI();
 
-    function cashout() {
-        if(!state.isPlaying) return;
-        
-        const winAmount = Math.floor(state.currentBet * state.multiplier);
-        state.balance += winAmount;
-        state.isPlaying = false;
-        
-        tg.HapticFeedback.notificationOccurred('success');
-        syncAndClose();
-    }
+        elBtn.style.display = 'none';
+        elCash.style.display = 'block';
+        elInput.disabled = true;
+    };
 
-    /* --- УРОВЕНЬ 3: СИНХРОНИЗАЦИЯ И ANTI-CHEAT --- */
-    function syncAndClose() {
-        // Финальная проверка целостности данных
-        const payload = {
-            action: "sync_balance",
-            start_balance: CONFIG.startBal,
-            final_balance: state.balance,
-            ts: CONFIG.ts,
-            sign: CONFIG.sign,
-            // Добавляем "отпечаток" игры для аудита админом
-            audit: btoa(`uid:${CONFIG.uid}|row:${state.currentRow}|bet:${state.currentBet}`)
+    elCash.onclick = () => {
+        if(!isPlaying) return;
+        const win = Math.floor(currentBet * multiplier);
+        balance += win;
+        endGame(true);
+    };
+
+    function endGame(isWin) {
+        isPlaying = false;
+        elCash.style.display = 'none';
+        elBtn.style.display = 'block';
+        elBtn.innerText = "ОБРАБОТКА...";
+        elBtn.disabled = true;
+
+        // Финальная синхронизация с защитой (Уровень 3)
+        const result = {
+            final_balance: balance,
+            start_balance: START_BAL,
+            ts: TS,
+            sign: SIGN,
+            is_win: isWin
         };
 
-        tg.sendData(JSON.stringify(payload));
-        
-        // Визуальное подтверждение
-        elBtnCash.innerText = "СИНХРОНИЗАЦИЯ...";
-        setTimeout(() => tg.close(), 100);
+        setTimeout(() => {
+            tg.sendData(JSON.stringify(result));
+            tg.close();
+        }, 800);
     }
 
-    function toggleUI(playing) {
-        elBtnMain.style.display = playing ? 'none' : 'block';
-        elBtnCash.style.display = playing ? 'block' : 'none';
-        elBetInput.disabled = playing;
-    }
-
-    // Обработчики кнопок
-    elBtnMain.onclick = startGame;
-    elBtnCash.onclick = cashout;
-
-    // Анти-дебаг (ловушка для консоли)
-    setInterval(() => {
-        const startTime = performance.now();
-        debugger; 
-        const endTime = performance.now();
-        if (endTime - startTime > 100) {
-            // Если код замер на debugger — консоль открыта
-            window.location.href = "about:blank";
-        }
-    }, 2000);
-
-    // Инициализация
-    document.getElementById('session-id').innerText = `SID: ${CONFIG.salt.slice(0,8)}`;
-    updateBalanceUI();
-    initGrid();
-
+    // Старт
+    renderGrid();
+    updateUI();
 </script>
+
 </body>
 </html>
