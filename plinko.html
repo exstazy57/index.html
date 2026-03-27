@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ULTRA PLINKO PRO</title>
+    <title>ULTRA PLINKO HD</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --primary: #00f2ff;
             --bg: #0a0b10;
             --panel: #161b22;
-            --accent: #ff0055;
         }
 
         body {
             margin: 0; background: var(--bg); color: white;
-            font-family: 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             overflow: hidden; display: flex; flex-direction: column;
             align-items: center; height: 100vh;
         }
@@ -26,44 +25,50 @@
         }
 
         .header {
-            display: flex; justify-content: space-between; padding: 15px;
-            font-weight: bold; font-size: 1.1rem; color: var(--primary);
-            z-index: 10; background: rgba(0,0,0,0.2);
+            display: flex; justify-content: space-between; padding: 20px;
+            font-weight: 800; font-size: 1.2rem; color: var(--primary);
+            z-index: 10; text-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
         }
 
-        canvas { display: block; width: 100%; flex-grow: 1; touch-action: none; }
+        canvas { 
+            display: block; width: 100%; flex-grow: 1; 
+            touch-action: none; image-rendering: -webkit-optimize-contrast;
+        }
 
         .ui-panel {
-            background: var(--panel); padding: 15px;
+            background: var(--panel); padding: 20px;
             border-top: 1px solid rgba(255,255,255,0.1);
-            border-radius: 20px 20px 0 0;
+            border-radius: 24px 24px 0 0;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
         }
 
-        .controls { display: flex; flex-direction: column; gap: 8px; }
-        .row { display: flex; gap: 8px; }
+        .controls { display: flex; flex-direction: column; gap: 12px; }
+        .row { display: flex; gap: 10px; }
         
         input, select {
-            flex: 1; background: #0a0b10; border: 1px solid #30363d;
-            color: white; padding: 10px; border-radius: 8px; outline: none; font-size: 14px;
+            flex: 1; background: #0d1117; border: 1px solid #30363d;
+            color: white; padding: 12px; border-radius: 12px; outline: none;
+            font-size: 16px; transition: 0.3s;
         }
 
         button {
-            padding: 14px; border: none; border-radius: 10px;
-            background: linear-gradient(45deg, var(--primary), #0066ff);
-            color: white; font-weight: bold; cursor: pointer;
-            text-transform: uppercase; font-size: 14px;
+            padding: 16px; border: none; border-radius: 14px;
+            background: linear-gradient(135deg, #00f2ff 0%, #0066ff 100%);
+            color: white; font-weight: 900; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3);
         }
 
         #multiplier-row {
-            display: flex; justify-content: center; gap: 2px;
-            padding: 5px 0; margin-bottom: 5px;
+            display: flex; justify-content: center; gap: 4px;
+            margin-bottom: 12px;
         }
 
         .slot {
-            flex: 1; height: 22px; border-radius: 4px;
-            font-size: 9px; display: flex; align-items: center;
+            flex: 1; height: 28px; border-radius: 6px;
+            font-size: 11px; display: flex; align-items: center;
             justify-content: center; font-weight: bold;
-            background: #1c2128; border: 1px solid rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
         }
     </style>
 </head>
@@ -72,7 +77,7 @@
 <div id="game-wrapper">
     <div class="header">
         <div id="bal-display">💰 0</div>
-        <div id="status">ULTRA PLINKO</div>
+        <div id="status">PREMIUM PLINKO</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -83,12 +88,12 @@
             <div class="row">
                 <input type="number" id="bet-amount" value="10" min="1">
                 <select id="difficulty">
-                    <option value="low">Низкий риск</option>
-                    <option value="mid" selected>Средний риск</option>
-                    <option value="high">Высокий риск</option>
+                    <option value="low">LOW RISK</option>
+                    <option value="mid" selected>NORMAL</option>
+                    <option value="high">HIGH RISK</option>
                 </select>
             </div>
-            <button id="drop-btn">Запустить шар</button>
+            <button id="drop-btn">DROP BALL</button>
         </div>
     </div>
 </div>
@@ -98,55 +103,47 @@
     tg.expand();
 
     const urlParams = new URLSearchParams(window.location.search);
-    // ИЗМЕНЕНО: Баланс по умолчанию 0
     let balance = parseInt(urlParams.get('bal')) || 0;
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const balDisplay = document.getElementById('bal-display');
-    const dropBtn = document.getElementById('drop-btn');
-    const multRow = document.getElementById('multiplier-row');
-
-    // ГЕОМЕТРИЯ: Уменьшили ряды и увеличили проходы
-    const ROWS = 9; 
-    const PIN_RADIUS = 2; // Маленькие пины
-    const BALL_RADIUS = 6; // Оптимальный шар
-    const GRAVITY = 0.35;
-    const BOUNCE = 0.45;
-    const FRICTION = 0.99;
-
-    const DIFF_SETTINGS = {
-        low:  [2, 1.5, 1.1, 0.5, 1.1, 1.5, 2],
-        mid:  [5, 2, 0.5, 0.2, 0.5, 2, 5],
-        high: [20, 5, 0.2, 0.1, 0.2, 5, 20]
-    };
+    
+    // ПАРАМЕТРЫ HD РАЗРЕШЕНИЯ
+    const dpr = window.devicePixelRatio || 1;
+    const ROWS = 8; 
+    const BALL_RADIUS = 7;
+    const PIN_RADIUS = 2.5;
 
     let pins = [];
     let balls = [];
+
+    const DIFF_SETTINGS = {
+        low:  [1.5, 1.2, 1.1, 1.1, 1.2, 1.5],
+        mid:  [5, 2, 0.5, 0.5, 2, 5],
+        high: [20, 10, 0.1, 0.1, 10, 20]
+    };
     let multipliers = DIFF_SETTINGS.mid;
 
-    function initGame() {
-        resize();
-        createPins();
-        updateMultipliers();
-        updateUI();
-    }
-
     function resize() {
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        createPins();
     }
 
     function createPins() {
         pins = [];
-        // Рассчитываем отступы так, чтобы проходы были широкими
-        const spacingX = canvas.width / (ROWS + 1);
-        const spacingY = (canvas.height * 0.7) / ROWS;
+        const w = canvas.width / dpr;
+        const h = canvas.height / dpr;
+        const spacingX = w / (ROWS + 1);
+        const spacingY = (h - 80) / ROWS;
 
         for (let r = 2; r <= ROWS; r++) {
             for (let i = 0; i < r; i++) {
-                const x = canvas.width / 2 + (i - (r - 1) / 2) * spacingX;
-                const y = r * spacingY + 30;
+                const x = w / 2 + (i - (r - 1) / 2) * spacingX;
+                const y = r * spacingY + 20;
                 pins.push({ x, y });
             }
         }
@@ -154,52 +151,51 @@
 
     function updateMultipliers() {
         multipliers = DIFF_SETTINGS[document.getElementById('difficulty').value];
-        multRow.innerHTML = '';
+        const row = document.getElementById('multiplier-row');
+        row.innerHTML = '';
         multipliers.forEach(m => {
             const div = document.createElement('div');
             div.className = 'slot';
             div.innerText = 'x' + m;
-            div.style.color = 'white';
-            div.style.backgroundColor = m >= 1 ? (m > 2 ? '#ffcc00' : '#2ea043') : '#ff4d4d';
-            multRow.appendChild(div);
+            div.style.background = m >= 1 ? 'linear-gradient(to bottom, #2ea043, #238636)' : 'linear-gradient(to bottom, #ff4d4d, #b91c1c)';
+            if (m > 5) div.style.background = 'linear-gradient(to bottom, #ffcc00, #d97706)';
+            row.appendChild(div);
         });
     }
 
-    document.getElementById('difficulty').onchange = updateMultipliers;
-
     class Ball {
         constructor(x, bet) {
-            this.x = x; this.y = 10;
-            this.vx = (Math.random() - 0.5) * 1.5;
+            const w = canvas.width / dpr;
+            this.x = x; this.y = -10;
+            this.vx = (Math.random() - 0.5) * 2;
             this.vy = 0;
             this.bet = bet;
-            this.color = '#00f2ff';
         }
 
         update() {
-            this.vy += GRAVITY;
+            this.vy += 0.4; // Gravity
             this.x += this.vx;
             this.y += this.vy;
-            this.vx *= FRICTION;
+            this.vx *= 0.99; // Friction
 
             pins.forEach(p => {
                 const dx = this.x - p.x;
                 const dy = this.y - p.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < BALL_RADIUS + PIN_RADIUS) {
                     const angle = Math.atan2(dy, dx);
-                    // Отскок
-                    const force = 1.8;
-                    this.vx = Math.cos(angle) * force + (Math.random() - 0.5);
-                    this.vy = Math.sin(angle) * force;
+                    const speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                    this.vx = Math.cos(angle) * 2.5 + (Math.random() - 0.5);
+                    this.vy = Math.sin(angle) * 2.5;
                     tg.HapticFeedback.impactOccurred('light');
                 }
             });
 
-            if (this.x < BALL_RADIUS) { this.x = BALL_RADIUS; this.vx *= -BOUNCE; }
-            if (this.x > canvas.width - BALL_RADIUS) { this.x = canvas.width - BALL_RADIUS; this.vx *= -BOUNCE; }
+            const w = canvas.width / dpr;
+            if (this.x < BALL_RADIUS) { this.x = BALL_RADIUS; this.vx *= -0.5; }
+            if (this.x > w - BALL_RADIUS) { this.x = w - BALL_RADIUS; this.vx *= -0.5; }
 
-            if (this.y > canvas.height - 30) {
+            if (this.y > (canvas.height / dpr) - 10) {
                 this.calculateWin();
                 return false;
             }
@@ -207,54 +203,63 @@
         }
 
         draw() {
-            ctx.fillStyle = this.color;
-            ctx.shadowBlur = 10; ctx.shadowColor = this.color;
-            ctx.beginPath(); ctx.arc(this.x, this.y, BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, BALL_RADIUS, 0, Math.PI * 2);
+            const grad = ctx.createRadialGradient(this.x-2, this.y-2, 1, this.x, this.y, BALL_RADIUS);
+            grad.addColorStop(0, '#ffffff');
+            grad.addColorStop(1, '#00f2ff');
+            ctx.fillStyle = grad;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00f2ff';
+            ctx.fill();
+            ctx.restore();
         }
 
         calculateWin() {
-            const sectionWidth = canvas.width / multipliers.length;
-            const index = Math.min(Math.floor(this.x / sectionWidth), multipliers.length - 1);
+            const w = canvas.width / dpr;
+            const sectionWidth = w / multipliers.length;
+            const index = Math.max(0, Math.min(Math.floor(this.x / sectionWidth), multipliers.length - 1));
             const m = multipliers[index];
-            const win = Math.floor(this.bet * m);
-            balance += win;
+            balance += Math.floor(this.bet * m);
             updateUI();
-            
-            // СИНХРОНИЗАЦИЯ С БОТОМ
             tg.sendData(JSON.stringify({ action: "sync_balance", final_balance: balance }));
         }
     }
 
-    dropBtn.onclick = () => {
+    document.getElementById('drop-btn').onclick = () => {
         const bet = parseInt(document.getElementById('bet-amount').value);
-        if (bet > balance || bet <= 0) return alert("Недостаточно баланса!");
+        if (bet > balance || bet <= 0) return alert("Low balance!");
         balance -= bet;
         updateUI();
-        balls.push(new Ball(canvas.width / 2 + (Math.random() - 0.5) * 15, bet));
-        tg.HapticFeedback.impactOccurred('medium');
+        balls.push(new Ball((canvas.width/dpr)/2 + (Math.random()-0.5)*20, bet));
     };
 
-    function updateUI() {
-        balDisplay.innerText = `💰 ${balance}`;
-    }
+    function updateUI() { balDisplay.innerText = `💰 ${balance}`; }
 
     function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.clearRect(0, 0, canvas.width/dpr, canvas.height/dpr);
+        
+        // Отрисовка пинов
+        ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
         pins.forEach(p => {
-            ctx.beginPath(); ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2);
+            ctx.fill();
         });
+
         balls = balls.filter(b => {
-            const alive = b.update();
-            if (alive) b.draw();
-            return alive;
+            if (b.update()) { b.draw(); return true; }
+            return false;
         });
         requestAnimationFrame(animate);
     }
 
-    window.onresize = () => { resize(); createPins(); };
-    initGame();
+    document.getElementById('difficulty').onchange = updateMultipliers;
+    window.addEventListener('resize', resize);
+    resize();
+    updateMultipliers();
+    updateUI();
     animate();
 </script>
 </body>
