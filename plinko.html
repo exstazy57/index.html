@@ -11,7 +11,6 @@
             --bg: #0a0b10;
             --panel: #161b22;
             --accent: #ff0055;
-            --gold: #ffcc00;
         }
 
         body {
@@ -27,47 +26,44 @@
         }
 
         .header {
-            display: flex; justify-content: space-between; padding: 20px;
-            font-weight: bold; font-size: 1.2rem; color: var(--primary);
-            z-index: 10;
+            display: flex; justify-content: space-between; padding: 15px;
+            font-weight: bold; font-size: 1.1rem; color: var(--primary);
+            z-index: 10; background: rgba(0,0,0,0.2);
         }
 
-        canvas { display: block; width: 100%; touch-action: none; }
+        canvas { display: block; width: 100%; flex-grow: 1; touch-action: none; }
 
         .ui-panel {
-            background: var(--panel); padding: 20px;
-            border-top: 2px solid rgba(255,255,255,0.1);
-            border-radius: 20px 20px 0 0; z-index: 10;
+            background: var(--panel); padding: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px 20px 0 0;
         }
 
-        .controls { display: flex; flex-direction: column; gap: 10px; }
-
-        .row { display: flex; gap: 10px; }
+        .controls { display: flex; flex-direction: column; gap: 8px; }
+        .row { display: flex; gap: 8px; }
+        
         input, select {
             flex: 1; background: #0a0b10; border: 1px solid #30363d;
-            color: white; padding: 12px; border-radius: 10px; outline: none;
+            color: white; padding: 10px; border-radius: 8px; outline: none; font-size: 14px;
         }
 
         button {
-            padding: 15px; border: none; border-radius: 10px;
+            padding: 14px; border: none; border-radius: 10px;
             background: linear-gradient(45deg, var(--primary), #0066ff);
             color: white; font-weight: bold; cursor: pointer;
-            text-transform: uppercase; transition: 0.2s;
+            text-transform: uppercase; font-size: 14px;
         }
 
-        button:active { transform: scale(0.95); filter: brightness(1.2); }
-        button:disabled { background: #30363d; cursor: not-allowed; opacity: 0.5; }
-
         #multiplier-row {
-            display: flex; justify-content: space-around;
+            display: flex; justify-content: center; gap: 2px;
             padding: 5px 0; margin-bottom: 5px;
         }
 
         .slot {
-            flex: 1; margin: 2px; height: 25px; border-radius: 4px;
-            font-size: 10px; display: flex; align-items: center;
+            flex: 1; height: 22px; border-radius: 4px;
+            font-size: 9px; display: flex; align-items: center;
             justify-content: center; font-weight: bold;
-            transition: 0.3s; background: #1c2128;
+            background: #1c2128; border: 1px solid rgba(255,255,255,0.05);
         }
     </style>
 </head>
@@ -76,7 +72,7 @@
 <div id="game-wrapper">
     <div class="header">
         <div id="bal-display">💰 0</div>
-        <div id="status">PLINKO</div>
+        <div id="status">ULTRA PLINKO</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -102,7 +98,8 @@
     tg.expand();
 
     const urlParams = new URLSearchParams(window.location.search);
-    let balance = parseInt(urlParams.get('bal')) || 1000;
+    // ИЗМЕНЕНО: Баланс по умолчанию 0
+    let balance = parseInt(urlParams.get('bal')) || 0;
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -110,18 +107,18 @@
     const dropBtn = document.getElementById('drop-btn');
     const multRow = document.getElementById('multiplier-row');
 
-    // Настройки уровней
-    const ROWS = 12;
-    const PIN_RADIUS = 3;
-    const BALL_RADIUS = 7;
-    const GRAVITY = 0.4;
-    const BOUNCE = 0.5;
-    const FRICTION = 0.98;
+    // ГЕОМЕТРИЯ: Уменьшили ряды и увеличили проходы
+    const ROWS = 9; 
+    const PIN_RADIUS = 2; // Маленькие пины
+    const BALL_RADIUS = 6; // Оптимальный шар
+    const GRAVITY = 0.35;
+    const BOUNCE = 0.45;
+    const FRICTION = 0.99;
 
     const DIFF_SETTINGS = {
-        low:  [5, 2, 1.2, 0.5, 0.2, 0.5, 1.2, 2, 5],
-        mid:  [10, 5, 2, 0.5, 0.2, 0.5, 2, 5, 10],
-        high: [50, 10, 3, 0.2, 0.1, 0.2, 3, 10, 50]
+        low:  [2, 1.5, 1.1, 0.5, 1.1, 1.5, 2],
+        mid:  [5, 2, 0.5, 0.2, 0.5, 2, 5],
+        high: [20, 5, 0.2, 0.1, 0.2, 5, 20]
     };
 
     let pins = [];
@@ -142,13 +139,14 @@
 
     function createPins() {
         pins = [];
-        const spacingX = canvas.width / (ROWS + 2);
-        const spacingY = (canvas.height - 100) / ROWS;
+        // Рассчитываем отступы так, чтобы проходы были широкими
+        const spacingX = canvas.width / (ROWS + 1);
+        const spacingY = (canvas.height * 0.7) / ROWS;
 
         for (let r = 2; r <= ROWS; r++) {
             for (let i = 0; i < r; i++) {
                 const x = canvas.width / 2 + (i - (r - 1) / 2) * spacingX;
-                const y = r * spacingY + 20;
+                const y = r * spacingY + 30;
                 pins.push({ x, y });
             }
         }
@@ -161,34 +159,21 @@
             const div = document.createElement('div');
             div.className = 'slot';
             div.innerText = 'x' + m;
-            div.style.backgroundColor = m >= 1 ? '#2ea043' : '#ff4d4d';
-            if (m > 5) div.style.backgroundColor = '#ffcc00';
+            div.style.color = 'white';
+            div.style.backgroundColor = m >= 1 ? (m > 2 ? '#ffcc00' : '#2ea043') : '#ff4d4d';
             multRow.appendChild(div);
         });
     }
 
     document.getElementById('difficulty').onchange = updateMultipliers;
 
-    function playSound(freq, type = 'sine', vol = 0.1) {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-    }
-
     class Ball {
         constructor(x, bet) {
-            this.x = x; this.y = 20;
-            this.vx = (Math.random() - 0.5) * 2;
+            this.x = x; this.y = 10;
+            this.vx = (Math.random() - 0.5) * 1.5;
             this.vy = 0;
             this.bet = bet;
-            this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+            this.color = '#00f2ff';
         }
 
         update() {
@@ -197,28 +182,24 @@
             this.y += this.vy;
             this.vx *= FRICTION;
 
-            // Коллизии с пинами
             pins.forEach(p => {
                 const dx = this.x - p.x;
                 const dy = this.y - p.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < BALL_RADIUS + PIN_RADIUS) {
                     const angle = Math.atan2(dy, dx);
-                    this.vx += Math.cos(angle) * 2;
-                    this.vy += Math.sin(angle) * 2;
-                    this.vx *= BOUNCE;
-                    this.vy *= BOUNCE;
-                    playSound(400 + Math.random() * 200, 'sine', 0.05);
+                    // Отскок
+                    const force = 1.8;
+                    this.vx = Math.cos(angle) * force + (Math.random() - 0.5);
+                    this.vy = Math.sin(angle) * force;
                     tg.HapticFeedback.impactOccurred('light');
                 }
             });
 
-            // Стенки
             if (this.x < BALL_RADIUS) { this.x = BALL_RADIUS; this.vx *= -BOUNCE; }
             if (this.x > canvas.width - BALL_RADIUS) { this.x = canvas.width - BALL_RADIUS; this.vx *= -BOUNCE; }
 
-            // Попадание в лузу
-            if (this.y > canvas.height - 40) {
+            if (this.y > canvas.height - 30) {
                 this.calculateWin();
                 return false;
             }
@@ -226,33 +207,31 @@
         }
 
         draw() {
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = this.color;
             ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10; ctx.shadowColor = this.color;
             ctx.beginPath(); ctx.arc(this.x, this.y, BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
             ctx.shadowBlur = 0;
         }
 
         calculateWin() {
             const sectionWidth = canvas.width / multipliers.length;
-            const index = Math.floor(this.x / sectionWidth);
+            const index = Math.min(Math.floor(this.x / sectionWidth), multipliers.length - 1);
             const m = multipliers[index];
             const win = Math.floor(this.bet * m);
             balance += win;
             updateUI();
             
+            // СИНХРОНИЗАЦИЯ С БОТОМ
             tg.sendData(JSON.stringify({ action: "sync_balance", final_balance: balance }));
-            playSound(win >= this.bet ? 800 : 200, 'square', 0.1);
         }
     }
 
     dropBtn.onclick = () => {
         const bet = parseInt(document.getElementById('bet-amount').value);
         if (bet > balance || bet <= 0) return alert("Недостаточно баланса!");
-
         balance -= bet;
         updateUI();
-        balls.push(new Ball(canvas.width / 2 + (Math.random() - 0.5) * 10, bet));
+        balls.push(new Ball(canvas.width / 2 + (Math.random() - 0.5) * 15, bet));
         tg.HapticFeedback.impactOccurred('medium');
     };
 
@@ -262,20 +241,15 @@
 
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Рисуем колышки
-        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
         pins.forEach(p => {
             ctx.beginPath(); ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2); ctx.fill();
         });
-
-        // Обновляем и рисуем шары
         balls = balls.filter(b => {
             const alive = b.update();
             if (alive) b.draw();
             return alive;
         });
-
         requestAnimationFrame(animate);
     }
 
