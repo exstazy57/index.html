@@ -3,359 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Omni-Hub Tower | Ultimate Secure</title>
+    <title>Omni-Hub: TOWER PRO Ultra Secure</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* --- СТИЛИ (NEON DARK MODE) --- */
+        /* --- CORE CSS (AAA PERFORMANCE) --- */
         :root {
-            --primary: #00f2ff;
-            --secondary: #7000ff;
-            --success: #00ff88;
-            --danger: #ff0055;
-            --bg: #050505;
-            --card: #121214;
-            --gold: #ffcc00;
+            --bg: #030305; --card: #0a0b10; --primary: #00f2ff; --primary-dim: rgba(0,242,255,0.1);
+            --secondary: #7000ff; --gold: #ffcc00; --success: #00ff88; --danger: #ff0055;
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --ease: cubic-bezier(0.23, 1, 0.32, 1);
         }
-
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; }
         body {
-            background-color: var(--bg);
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
+            background-color: var(--bg); color: #fff; font-family: var(--font); margin: 0; padding: 0;
+            height: 100vh; overflow: hidden; display: flex; justify-content: center;
+            background-image: radial-gradient(circle at 50% 10%, #1a1b25 0%, #030305 100%);
         }
+        #stage { width: 100%; max-width: 480px; height: 100%; display: flex; flex-direction: column; position: relative; opacity: 0; transition: opacity 0.5s ease; }
+        #stage.ready { opacity: 1; }
 
-        #ui-wrapper {
-            width: 100%;
-            max-width: 420px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            padding: 16px;
-            gap: 12px;
-        }
+        /* HEADER */
+        .hud { padding: env(safe-area-inset-top, 15px) 20px 10px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .bal-display { background: rgba(0,0,0,0.3); padding: 8px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .bal-display span { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; display: block; }
+        .bal-display b { font-size: 19px; color: var(--gold); text-shadow: 0 0 10px rgba(255,204,0,0.3); }
+        .mult-display { text-align: right; }
+        .mult-display b { font-size: 26px; color: var(--primary); text-shadow: 0 0 15px var(--primary-dim); font-weight: 900; }
 
-        /* Header с балансом */
-        .game-header {
-            background: var(--card);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 20px;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .bal-box span { font-size: 12px; color: #888; display: block; text-transform: uppercase; }
-        .bal-box b { font-size: 20px; color: var(--gold); }
-
-        .mult-box { text-align: right; }
-        .mult-box b { font-size: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(0,242,255,0.5); }
-
-        /* Игровое поле */
-        .grid-container {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-            position: relative;
-        }
-
-        .row {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-            justify-content: center;
-        }
-
+        /* GRID */
+        #viewport { flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 10px; position: relative; overflow: hidden; }
+        #grid { display: flex; flex-direction: column-reverse; gap: 8px; width: 100%; max-width: 340px; perspective: 1000px; }
+        .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; transform-style: preserve-3d; transition: transform 0.4s var(--ease), opacity 0.4s ease; }
+        .row.locked { opacity: 0.15; transform: translateZ(-50px) translateY(10px); }
+        .row.active { opacity: 1; transform: translateZ(0) translateY(0); }
+        
+        /* CELLS & ANIMATIONS */
         .cell {
-            width: 22%;
-            aspect-ratio: 1/1;
-            background: #1a1a1c;
-            border: 1px solid #2a2a2c;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            aspect-ratio: 1/1; background: var(--card); border-radius: 14px; border: 1px solid rgba(255,255,255,0.03);
+            display: flex; align-items: center; justify-content: center; font-size: 28px;
+            transition: background 0.2s ease, border 0.2s ease, transform 0.2s var(--ease);
+            position: relative; overflow: hidden; box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
         }
-
-        /* Состояния ячеек */
-        .cell.active-row { border-color: var(--primary); background: #1e2a2d; box-shadow: inset 0 0 10px rgba(0,242,255,0.1); }
-        .cell.win { background: rgba(0, 255, 136, 0.15); border-color: var(--success); color: var(--success); }
-        .cell.loss { background: rgba(255, 0, 85, 0.15); border-color: var(--danger); animation: shake 0.3s; }
-        .cell.disabled { opacity: 0.3; cursor: default; }
-
-        /* Контроллы */
-        .footer-controls {
-            background: var(--card);
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 24px 24px 0 0;
-            margin: 0 -16px -16px -16px;
+        .row.active .cell { cursor: pointer; border-color: rgba(255,255,255,0.08); }
+        .row.active .cell:active { transform: scale(0.92); background: #12131a; }
+        .cell.win { background: rgba(0, 255, 136, 0.06); border-color: var(--success); color: var(--success); box-shadow: 0 0 20px rgba(0,255,136,0.2); animation: cellWin 0.5s var(--ease); }
+        .cell.loss { background: rgba(255, 0, 85, 0.1); border-color: var(--danger); animation: cellLoss 0.6s var(--ease); }
+        
+        @keyframes cellWin { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        @keyframes cellLoss { 0% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } 100% { transform: translateX(0); } }
+        
+        /* Shimmer Effect */
+        .cell.win::after {
+            content: ''; position: absolute; top: -100%; left: -100%; width: 300%; height: 300%;
+            background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0) 100%);
+            animation: shimmer 1s var(--ease);
         }
+        @keyframes shimmer { 0% { transform: translate(-30%, -30%); } 100% { transform: translate(30%, 30%); } }
 
-        .bet-input-wrap {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            margin-bottom: 15px;
+        /* CONTROLS */
+        .drawer { background: var(--card); border-top: 1px solid rgba(255,255,255,0.05); padding: 20px 25px env(safe-area-inset-bottom, 20px) 25px; border-radius: 30px 30px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); z-index: 10; }
+        .input-box { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 5px; display: flex; align-items: center; margin-bottom: 15px; }
+        .input-box input { flex-grow: 1; background: none; border: none; color: #fff; font-size: 20px; font-weight: bold; text-align: center; outline: none; padding: 10px; }
+        .input-box button { background: rgba(255,255,255,0.05); border: none; color: #fff; width: 40px; height: 40px; border-radius: 12px; font-size: 20px; cursor: pointer; }
+        
+        .btn-core {
+            width: 100%; padding: 18px; border: none; border-radius: 18px; font-size: 17px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer; transition: all 0.3s var(--ease); position: relative; overflow: hidden;
         }
+        .btn-play { background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%); color: #fff; box-shadow: 0 5px 20px rgba(0,242,255,0.3); }
+        .btn-play:active { transform: translateY(2px); box-shadow: 0 2px 10px rgba(0,242,255,0.2); }
+        
+        .btn-cashout { background: var(--success); color: #000; box-shadow: 0 5px 20px rgba(0,255,136,0.3); display: none; }
+        .btn-cashout:active { transform: translateY(2px); box-shadow: 0 2px 10px rgba(0,255,136,0.2); }
+        
+        .btn-core:disabled { background: #1a1b21; color: #555; box-shadow: none; cursor: not-allowed; }
 
-        input {
-            background: #000;
-            border: 1px solid #333;
-            color: #fff;
-            padding: 12px;
-            border-radius: 12px;
-            font-size: 18px;
-            text-align: center;
-            outline: none;
-        }
-
-        .main-btn {
-            background: linear-gradient(135deg, var(--secondary), var(--primary));
-            color: #fff;
-            border: none;
-            padding: 16px;
-            border-radius: 14px;
-            font-size: 16px;
-            font-weight: bold;
-            width: 100%;
-            box-shadow: 0 4px 15px rgba(112,0,255,0.3);
-        }
-
-        .cashout-btn {
-            background: var(--success);
-            color: #000;
-            display: none;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-
-        /* Overlay */
-        #msg-overlay {
-            position: fixed;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9);
-            padding: 20px;
-            border-radius: 15px;
-            border: 1px solid var(--primary);
-            z-index: 100;
-            display: none;
-            text-align: center;
-        }
+        /* OVERLAYS */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 100; display: none; align-items: center; justify-content: center; flex-direction: column; opacity: 0; transition: opacity 0.3s ease; }
+        .overlay.show { display: flex; opacity: 1; }
+        .stat-card { background: var(--card); padding: 30px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.05); text-align: center; max-width: 300px; width: 90%; }
+        .stat-card h1 { margin: 0 0 10px 0; font-size: 28px; }
+        .stat-card p { margin: 0 0 20px 0; font-size: 16px; color: #aaa; }
+        .res-win { color: var(--success); text-shadow: 0 0 15px rgba(0,255,136,0.3); }
+        .res-loss { color: var(--danger); text-shadow: 0 0 15px rgba(255,0,85,0.3); }
+        
+        /* Стилизация скроллбара (для десктопа) */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
 <body>
 
-<div id="ui-wrapper">
-    <div class="game-header">
-        <div class="bal-box">
-            <span>Ваш счёт</span>
-            <b id="balance-display">0 ⭐</b>
+    <div id="stage">
+        <div class="hud">
+            <div class="bal-display">
+                <span>БАНК (⭐)</span>
+                <b id="bal-ui">0</b>
+            </div>
+            <div class="mult-display">
+                <span>МНОЖИТЕЛЬ</span>
+                <b id="mult-ui">x1.00</b>
+            </div>
         </div>
-        <div class="mult-box">
-            <span>Множитель</span>
-            <b id="multiplier-display">x1.00</b>
+
+        <div id="viewport">
+            <div id="grid">
+                </div>
+        </div>
+
+        <div class="drawer">
+            <div class="input-box">
+                <button id="bet-minus">−</button>
+                <input type="number" id="bet-input" value="10" inputmode="numeric">
+                <button id="bet-plus">+</button>
+            </div>
+            <button id="btn-play" class="btn-core btn-play">Начать игру</button>
+            <button id="btn-cash" class="btn-core btn-cashout">Забрать: <span id="cash-val">0</span> ⭐</button>
         </div>
     </div>
 
-    <div class="grid-container" id="grid">
-        </div>
+    /* =================================================================
+       --- AAA GAME ENGINE & SECURITY CORE (18,000+ SYMBOLS) ---
+       ================================================================= */
+    <script>
+    (function OmniHubTowerPro() {
+        "use strict";
 
-    <div class="footer-controls">
-        <div class="bet-input-wrap">
-            <input type="number" id="bet-field" value="10" placeholder="Ставка">
-        </div>
-        <button id="action-btn" class="main-btn">ИГРАТЬ</button>
-        <button id="cash-btn" class="main-btn cashout-btn">ЗАБРАТЬ</button>
-    </div>
-</div>
+        // --- 1. CONFIGURATION & STATE ---
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
 
-<div id="msg-overlay"></div>
-
-<script>
-    // --- ИНИЦИАЛИЗАЦИЯ TG WEBAPP ---
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.ready();
-
-    // --- ПАРАМЕТРЫ (3 уровня защиты) ---
-    const params = new URLSearchParams(window.location.search);
-    const UID = params.get('uid') || "dev_user";
-    const START_BAL = parseInt(params.get('bal')) || 1000; // Fail-safe
-    const TS = params.get('ts') || Date.now();
-    const SIGN = params.get('sign') || "dev_sign";
-
-    let balance = START_BAL;
-    let currentBet = 0;
-    let currentRow = 0;
-    let isPlaying = false;
-    let multiplier = 1.0;
-    let bombs = [];
-
-    const elGrid = document.getElementById('grid');
-    const elBal = document.getElementById('balance-display');
-    const elMult = document.getElementById('multiplier-display');
-    const elBtn = document.getElementById('action-btn');
-    const elCash = document.getElementById('cash-btn');
-    const elInput = document.getElementById('bet-field');
-
-    // 1. Seed-генератор бомб (Уровень 2 защиты)
-    function generateLevelBombs() {
-        let b = [];
-        let seed = parseInt(TS.toString().slice(-6));
-        for(let i=0; i<8; i++) {
-            seed = (seed * 16807) % 2147483647;
-            b.push(seed % 4);
-        }
-        return b;
-    }
-
-    // 2. Отрисовка поля
-    function renderGrid() {
-        elGrid.innerHTML = '';
-        for(let r=7; r>=0; r--) {
-            const rowDiv = document.createElement('div');
-            rowDiv.className = 'row';
-            rowDiv.id = `row-${r}`;
-            for(let c=0; c<4; c++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell disabled';
-                cell.id = `c-${r}-${c}`;
-                cell.dataset.r = r;
-                cell.dataset.c = c;
-                cell.addEventListener('click', () => handleStep(r, c));
-                rowDiv.appendChild(cell);
-            }
-            elGrid.appendChild(rowDiv);
-        }
-    }
-
-    function updateUI() {
-        elBal.innerText = `${balance} ⭐`;
-        elMult.innerText = `x${multiplier.toFixed(2)}`;
-    }
-
-    // 3. Логика хода
-    function handleStep(r, c) {
-        if(!isPlaying || r !== currentRow) return;
-
-        const cell = document.getElementById(`c-${r}-${c}`);
-        const bombCol = bombs[r];
-
-        if(c === bombCol) {
-            // ПРОИГРЫШ
-            cell.classList.add('loss');
-            cell.innerHTML = '💣';
-            tg.HapticFeedback.notificationOccurred('error');
-            endGame(false);
-        } else {
-            // УСПЕХ
-            cell.classList.add('win');
-            cell.innerHTML = '💎';
-            tg.HapticFeedback.impactOccurred('medium');
-            
-            currentRow++;
-            multiplier += (0.2 + (r * 0.1));
-            updateUI();
-
-            if(currentRow > 7) {
-                endGame(true);
-            } else {
-                highlightRow(currentRow);
-            }
-        }
-    }
-
-    function highlightRow(idx) {
-        document.querySelectorAll('.cell').forEach(c => c.classList.remove('active-row'));
-        document.querySelectorAll(`.cell[data-r="${idx}"]`).forEach(c => {
-            c.classList.remove('disabled');
-            c.classList.add('active-row');
-        });
-    }
-
-    // 4. Управление игрой
-    elBtn.onclick = () => {
-        if(isPlaying) return;
+        const PARAMS = new URLSearchParams(window.location.search);
         
-        currentBet = parseInt(elInput.value);
-        if(currentBet > balance || currentBet <= 0) {
-            return tg.showAlert("Недостаточно средств!");
-        }
-
-        balance -= currentBet;
-        isPlaying = true;
-        currentRow = 0;
-        multiplier = 1.0;
-        bombs = generateLevelBombs();
-
-        renderGrid();
-        highlightRow(0);
-        updateUI();
-
-        elBtn.style.display = 'none';
-        elCash.style.display = 'block';
-        elInput.disabled = true;
-    };
-
-    elCash.onclick = () => {
-        if(!isPlaying) return;
-        const win = Math.floor(currentBet * multiplier);
-        balance += win;
-        endGame(true);
-    };
-
-    function endGame(isWin) {
-        isPlaying = false;
-        elCash.style.display = 'none';
-        elBtn.style.display = 'block';
-        elBtn.innerText = "ОБРАБОТКА...";
-        elBtn.disabled = true;
-
-        // Финальная синхронизация с защитой (Уровень 3)
-        const result = {
-            final_balance: balance,
-            start_balance: START_BAL,
-            ts: TS,
-            sign: SIGN,
-            is_win: isWin
+        // AAA Security: Прямая привязка к защищенным параметрам бота
+        const AUTH = {
+            uid: PARAMS.get('uid') || "dev_admin",
+            startBalance: parseInt(PARAMS.get('bal')) || 1000,
+            ts: PARAMS.get('ts') || Date.now().toString(),
+            sign: PARAMS.get('sign') || "dev_signature_unsigned"
         };
 
-        setTimeout(() => {
-            tg.sendData(JSON.stringify(result));
-            tg.close();
-        }, 800);
-    }
+        const GAME_CFG = {
+            rows: 8, cols: 4,
+            baseMult: 1.0,
+            multStep: 0.35, // Прогрессивный шаг множителя
+            minBet: 1, maxBet: 10000,
+            assetPath: './assets/' // Путь к звукам
+        };
 
-    // Старт
-    renderGrid();
-    updateUI();
-</script>
+        let state = {
+            balance: AUTH.startBalance,
+            currentBet: 0,
+            currentRow: 0,
+            playing: false,
+            bombs: [],
+            multiplier: 1.0,
+            safeClicks: 0,
+            history: [] // Для Integrity Check
+        };
 
-</body>
-</html>
+        // AAA Sound Engine (Web Audio API)
+        const SoundEngine = (() => {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const buffers = {};
+            const files = {
+                click: 'click.wav',
+                win_row: 'win_row.wav',
+                bomb: 'bomb.wav',
+                cashout: 'cashout.wav'
+            };
+
+            async function load() {
+                for (const [key, file] of Object.entries(files)) {
+                    try {
+                        const response = await fetch(GAME_CFG.assetPath + file);
+                        if(!response.ok) throw new Error("File not found");
+                        const arrayBuffer = await response.arrayBuffer();
+                        buffers[key] = await ctx.decodeAudioData(arrayBuffer);
+                    } catch (e) { console.warn(`SoundEngine: Failed to load ${file}. Игра пойдет без звука.`); }
+                }
+            }
+
+            function play(key, pannerValue = 0) {
+                if (!buffers[key]) return;
+                if (ctx.state === 'suspended') ctx.resume();
+                
+                const source = ctx.createBufferSource();
+                source.buffer = buffers[key];
+
+                // AAA Panning эффект (звук левее/правее в зависимости от колонки)
+                const panner = ctx.createPanner();
+                panner.panningModel = 'equalpower';
+                panner.setPosition(pannerValue, 0, 1 - Math.abs(pannerValue));
+
+                source.connect(panner).connect(ctx.destination);
+                source.start(0);
+            }
+
+            load(); // Предзагрузка
+            return { play };
+        })();
+
+        // AAA Haptics Engine
+        const Haptics = {
+            light: () => tg.HapticFeedback.impactOccurred('light'),
+            medium: () => tg.HapticFeedback.impactOccurred('medium'),
+            rigid: () => tg.HapticFeedback.impactOccurred('rigid'),
+            error: () => tg.HapticFeedback.notificationOccurred('error'),
+            success: () => tg.HapticFeedback.notificationOccurred('success')
+        };
+
+        // --- 2. DOM & UI ENGINE ---
+        const DOM = {
+            stage: document.getElementById('stage'),
+            bal: document.getElementById('bal-ui'),
+            mult: document.getElementById('mult-ui'),
+            grid: document.getElementById('grid'),
+            bet: document.getElementById('bet-input'),
+            btnPlay: document.getElementById('btn-play'),
+            btnCash: document.getElementById('btn-cash'),
+            cashVal: document.getElementById('cash-val'),
+            plus: document.getElementById('bet-plus'),
+            minus: document.getElementById('bet-minus')
+        };
+
+        function updateUI(animateBalance = false) {
+            // AAA Анимация цифр баланса
+            if (animateBalance) {
+                animateNumber(DOM.bal, state.balance);
+            } else {
+                DOM.bal.innerText = state.balance.toLocaleString();
+            }
+            
+            DOM.mult.innerText = `x${state.multiplier.toFixed(2)}`;
+            DOM.cashVal.innerText = Math.floor(state.currentBet * state.multiplier).toLocaleString();
+            DOM.minus.disabled = DOM.plus.disabled = DOM.bet.disabled = state.playing;
+        }
+
+        function animateNumber(element, finalValue) {
+            const startValue = parseInt(element.innerText.replace(/,/g, '')) || 0;
+            if(startValue === finalValue) return;
+            const duration = 800;
+            const startTime = performance.now();
+
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                // EaseOutQuad function
+                const easeProgress = 1 - (1 - progress) * (1 - progress);
+                const current = Math.floor(startValue + (finalValue - startValue) * easeProgress);
+                element.innerText = current.toLocaleString();
+                
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        //
