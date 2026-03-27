@@ -1,168 +1,287 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PLINKO STARS</title>
+    <title>ULTRA PLINKO PRO</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #0a0a0c; font-family: 'Orbitron'; color: white; overflow: hidden; }
-        canvas { display: block; margin: 0 auto; background: radial-gradient(circle, #1a1a2e 0%, #0a0a0c 100%); }
-        #ui-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .header { padding: 15px; display: flex; justify-content: space-between; pointer-events: auto; background: rgba(0,0,0,0.5); }
-        .balance { color: #00f2ff; text-shadow: 0 0 10px #00f2ff; font-size: 18px; }
-        .controls { position: fixed; bottom: 0; width: 100%; padding: 20px; box-sizing: border-box; background: #16161a; pointer-events: auto; border-top: 1px solid #333; }
-        input { background: #000; border: 1px solid #00f2ff; color: white; padding: 10px; width: 80px; border-radius: 5px; text-align: center; }
-        #drop-btn { background: linear-gradient(180deg, #00f2ff, #0077ff); color: #000; border: none; padding: 10px 30px; border-radius: 5px; font-weight: bold; font-family: 'Orbitron'; cursor: pointer; }
-        .exit-link { display: block; text-align: center; margin-top: 10px; font-size: 10px; color: #444; cursor: pointer; }
+        :root {
+            --primary: #00f2ff;
+            --bg: #0a0b10;
+            --panel: #161b22;
+            --accent: #ff0055;
+            --gold: #ffcc00;
+        }
+
+        body {
+            margin: 0; background: var(--bg); color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden; display: flex; flex-direction: column;
+            align-items: center; height: 100vh;
+        }
+
+        #game-wrapper {
+            position: relative; width: 100%; max-width: 500px;
+            height: 100%; display: flex; flex-direction: column;
+        }
+
+        .header {
+            display: flex; justify-content: space-between; padding: 20px;
+            font-weight: bold; font-size: 1.2rem; color: var(--primary);
+            z-index: 10;
+        }
+
+        canvas { display: block; width: 100%; touch-action: none; }
+
+        .ui-panel {
+            background: var(--panel); padding: 20px;
+            border-top: 2px solid rgba(255,255,255,0.1);
+            border-radius: 20px 20px 0 0; z-index: 10;
+        }
+
+        .controls { display: flex; flex-direction: column; gap: 10px; }
+
+        .row { display: flex; gap: 10px; }
+        input, select {
+            flex: 1; background: #0a0b10; border: 1px solid #30363d;
+            color: white; padding: 12px; border-radius: 10px; outline: none;
+        }
+
+        button {
+            padding: 15px; border: none; border-radius: 10px;
+            background: linear-gradient(45deg, var(--primary), #0066ff);
+            color: white; font-weight: bold; cursor: pointer;
+            text-transform: uppercase; transition: 0.2s;
+        }
+
+        button:active { transform: scale(0.95); filter: brightness(1.2); }
+        button:disabled { background: #30363d; cursor: not-allowed; opacity: 0.5; }
+
+        #multiplier-row {
+            display: flex; justify-content: space-around;
+            padding: 5px 0; margin-bottom: 5px;
+        }
+
+        .slot {
+            flex: 1; margin: 2px; height: 25px; border-radius: 4px;
+            font-size: 10px; display: flex; align-items: center;
+            justify-content: center; font-weight: bold;
+            transition: 0.3s; background: #1c2128;
+        }
     </style>
 </head>
 <body>
 
-<canvas id="gameCanvas"></canvas>
-
-<div id="ui-overlay">
+<div id="game-wrapper">
     <div class="header">
-        <div style="color:#00f2ff">PLINKO</div>
-        <div class="balance">⭐ <span id="balance-val">0</span></div>
+        <div id="bal-display">💰 0</div>
+        <div id="status">PLINKO</div>
     </div>
-    <div class="controls">
-        <div style="display:flex; justify-content:center; gap:10px; align-items:center;">
-            <input type="number" id="bet-amount" value="10">
-            <button id="drop-btn" onclick="dropBall()">СТАВКА</button>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="ui-panel">
+        <div id="multiplier-row"></div>
+        <div class="controls">
+            <div class="row">
+                <input type="number" id="bet-amount" value="10" min="1">
+                <select id="difficulty">
+                    <option value="low">Низкий риск</option>
+                    <option value="mid" selected>Средний риск</option>
+                    <option value="high">Высокий риск</option>
+                </select>
+            </div>
+            <button id="drop-btn">Запустить шар</button>
         </div>
-        <div class="exit-link" onclick="finalizeAndExit()">СОХРАНИТЬ И ВЫЙТИ</div>
     </div>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let balance = parseInt(urlParams.get('bal')) || 1000;
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    
-    let balance = 0;
+    const balDisplay = document.getElementById('bal-display');
+    const dropBtn = document.getElementById('drop-btn');
+    const multRow = document.getElementById('multiplier-row');
+
+    // Настройки уровней
+    const ROWS = 12;
+    const PIN_RADIUS = 3;
+    const BALL_RADIUS = 7;
+    const GRAVITY = 0.4;
+    const BOUNCE = 0.5;
+    const FRICTION = 0.98;
+
+    const DIFF_SETTINGS = {
+        low:  [5, 2, 1.2, 0.5, 0.2, 0.5, 1.2, 2, 5],
+        mid:  [10, 5, 2, 0.5, 0.2, 0.5, 2, 5, 10],
+        high: [50, 10, 3, 0.2, 0.1, 0.2, 3, 10, 50]
+    };
+
+    let pins = [];
     let balls = [];
-    const pins = [];
-    const buckets = [5, 2, 0.5, 0.2, 0.5, 2, 5];
-    const rows = 8;
+    let multipliers = DIFF_SETTINGS.mid;
 
-    // --- СИНХРОНИЗАЦИЯ ---
-    async function syncData() {
-        return new Promise((resolve) => {
-            tg.CloudStorage.getItem('user_balance', (err, value) => {
-                if (!err && value) {
-                    balance = parseInt(value);
-                } else {
-                    const params = new URLSearchParams(window.location.search);
-                    balance = parseInt(params.get('bal')) || 0;
-                }
-                updateUI();
-                resolve();
-            });
-        });
-    }
-
-    function saveBalance() {
+    function initGame() {
+        resize();
+        createPins();
+        updateMultipliers();
         updateUI();
-        tg.CloudStorage.setItem('user_balance', balance.toString());
     }
 
-    function updateUI() {
-        document.getElementById('balance-val').innerText = balance.toLocaleString();
+    function resize() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
     }
 
-    // --- ИГРОВАЯ ЛОГИКА ---
-    function initPins() {
-        const spacing = canvas.width / 8;
-        for (let r = 2; r <= rows; r++) {
+    function createPins() {
+        pins = [];
+        const spacingX = canvas.width / (ROWS + 2);
+        const spacingY = (canvas.height - 100) / ROWS;
+
+        for (let r = 2; r <= ROWS; r++) {
             for (let i = 0; i < r; i++) {
-                pins.push({
-                    x: canvas.width/2 - (r-1)*spacing/2 + i*spacing,
-                    y: r * spacing * 0.8 + 50
-                });
+                const x = canvas.width / 2 + (i - (r - 1) / 2) * spacingX;
+                const y = r * spacingY + 20;
+                pins.push({ x, y });
             }
         }
     }
 
-    function dropBall() {
-        const amount = parseInt(document.getElementById('bet-amount').value);
-        if (amount > balance || amount < 1) return;
-
-        balance -= amount;
-        saveBalance(); // Сохраняем списание
-
-        balls.push({
-            x: canvas.width/2 + (Math.random()-0.5)*10,
-            y: 30,
-            vx: 0,
-            vy: 0,
-            bet: amount
+    function updateMultipliers() {
+        multipliers = DIFF_SETTINGS[document.getElementById('difficulty').value];
+        multRow.innerHTML = '';
+        multipliers.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'slot';
+            div.innerText = 'x' + m;
+            div.style.backgroundColor = m >= 1 ? '#2ea043' : '#ff4d4d';
+            if (m > 5) div.style.backgroundColor = '#ffcc00';
+            multRow.appendChild(div);
         });
     }
 
-    function update() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Рисуем колышки
-        ctx.fillStyle = "#444";
-        pins.forEach(p => {
-            ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
-        });
+    document.getElementById('difficulty').onchange = updateMultipliers;
 
-        // Рисуем лунки
-        const bWidth = canvas.width / buckets.length;
-        buckets.forEach((m, i) => {
-            ctx.fillStyle = m >= 1 ? "#00ff44" : "#ff4444";
-            ctx.fillRect(i * bWidth + 2, canvas.height - 120, bWidth - 4, 30);
-            ctx.fillStyle = "black";
-            ctx.font = "10px Orbitron";
-            ctx.fillText(m + "x", i * bWidth + bWidth/3, canvas.height - 100);
-        });
+    function playSound(freq, type = 'sine', vol = 0.1) {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+    }
 
-        // Обновляем шарики
-        for (let i = balls.length - 1; i >= 0; i--) {
-            let b = balls[i];
-            b.vy += 0.3;
-            b.x += b.vx;
-            b.y += b.vy;
+    class Ball {
+        constructor(x, bet) {
+            this.x = x; this.y = 20;
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = 0;
+            this.bet = bet;
+            this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+        }
+
+        update() {
+            this.vy += GRAVITY;
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vx *= FRICTION;
 
             // Коллизии с пинами
             pins.forEach(p => {
-                const dist = Math.hypot(b.x - p.x, b.y - p.y);
-                if (dist < 8) {
-                    b.vy *= -0.5;
-                    b.vx += (b.x - p.x) * 0.2;
+                const dx = this.x - p.x;
+                const dy = this.y - p.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < BALL_RADIUS + PIN_RADIUS) {
+                    const angle = Math.atan2(dy, dx);
+                    this.vx += Math.cos(angle) * 2;
+                    this.vy += Math.sin(angle) * 2;
+                    this.vx *= BOUNCE;
+                    this.vy *= BOUNCE;
+                    playSound(400 + Math.random() * 200, 'sine', 0.05);
+                    tg.HapticFeedback.impactOccurred('light');
                 }
             });
 
-            // Рисуем шарик
-            ctx.fillStyle = "#00f2ff";
-            ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, Math.PI*2); ctx.fill();
+            // Стенки
+            if (this.x < BALL_RADIUS) { this.x = BALL_RADIUS; this.vx *= -BOUNCE; }
+            if (this.x > canvas.width - BALL_RADIUS) { this.x = canvas.width - BALL_RADIUS; this.vx *= -BOUNCE; }
 
-            // Попадание в лунку
-            if (b.y > canvas.height - 120) {
-                let bucketIdx = Math.floor(b.x / bWidth);
-                bucketIdx = Math.max(0, Math.min(bucketIdx, buckets.length - 1));
-                
-                let win = Math.floor(b.bet * buckets[bucketIdx]);
-                balance += win;
-                saveBalance(); // Сохраняем выигрыш
-                balls.splice(i, 1);
+            // Попадание в лузу
+            if (this.y > canvas.height - 40) {
+                this.calculateWin();
+                return false;
             }
+            return true;
         }
-        requestAnimationFrame(update);
+
+        draw() {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            ctx.beginPath(); ctx.arc(this.x, this.y, BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        calculateWin() {
+            const sectionWidth = canvas.width / multipliers.length;
+            const index = Math.floor(this.x / sectionWidth);
+            const m = multipliers[index];
+            const win = Math.floor(this.bet * m);
+            balance += win;
+            updateUI();
+            
+            tg.sendData(JSON.stringify({ action: "sync_balance", final_balance: balance }));
+            playSound(win >= this.bet ? 800 : 200, 'square', 0.1);
+        }
     }
 
-    function finalizeAndExit() {
-        tg.sendData(JSON.stringify({action: "sync_balance", final_balance: balance}));
+    dropBtn.onclick = () => {
+        const bet = parseInt(document.getElementById('bet-amount').value);
+        if (bet > balance || bet <= 0) return alert("Недостаточно баланса!");
+
+        balance -= bet;
+        updateUI();
+        balls.push(new Ball(canvas.width / 2 + (Math.random() - 0.5) * 10, bet));
+        tg.HapticFeedback.impactOccurred('medium');
+    };
+
+    function updateUI() {
+        balDisplay.innerText = `💰 ${balance}`;
     }
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    syncData();
-    initPins();
-    update();
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Рисуем колышки
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        pins.forEach(p => {
+            ctx.beginPath(); ctx.arc(p.x, p.y, PIN_RADIUS, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Обновляем и рисуем шары
+        balls = balls.filter(b => {
+            const alive = b.update();
+            if (alive) b.draw();
+            return alive;
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    window.onresize = () => { resize(); createPins(); };
+    initGame();
+    animate();
 </script>
 </body>
 </html>
